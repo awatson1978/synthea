@@ -1,0 +1,381 @@
+{
+  "name": "andv_incubation_prodrome",
+  "remarks": [
+    "ANDV Incubation and Prodrome Submodule",
+    "",
+    "Models the long Andes virus incubation period, then forks into asymptomatic,",
+    "mild self-limiting, or HCPS-trajectory clinical courses.",
+    "",
+    "Key epidemiologic parameters:",
+    "  Incubation: 4-42 days, CDC interim guidance median ~18 days.",
+    "              Synthea uses UNIFORM 4-42 (lognormal not natively supported);",
+    "              this approximates the range while slightly overrepresenting extremes.",
+    "  Trajectory: 5% asymptomatic, 25% mild (no HCPS), 70% HCPS-trajectory.",
+    "              Asymptomatic fraction is highly uncertain (0-10% per surveillance data).",
+    "",
+    "Prodrome symptoms (nonspecific, 2-8 days before cardiopulmonary decompensation):",
+    "  Fever, myalgia, malaise, headache, nausea/vomiting, diarrhea, abdominal pain.",
+    "  Respiratory symptoms minimal in prodrome; dyspnea marks dangerous transition.",
+    "",
+    "Attributes set:",
+    "  andv_test_day_from_onset : integer day counter for diagnostic timing logic",
+    "  andv_trajectory          : 'asymptomatic' | 'mild' | 'hcps'",
+    "",
+    "References:",
+    "  - CDC Andes Virus interim guidance (2026); WHO hantavirus fact sheet",
+    "  - Epuyen 2018-19 outbreak: 34 cases, mean incubation ~18.5 days, range to 42 days"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Incubation_Delay"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Incubation_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "4-42 day incubation period. CDC median 18 days; WHO reports 1 week to 8 weeks.",
+        "Uniform approximation — the 18-day median is not preserved but the range is correct."
+      ],
+      "range": {
+        "low": 4,
+        "high": 42,
+        "unit": "days"
+      },
+      "direct_transition": "Set_Onset_Day_Zero"
+    },
+    "Set_Onset_Day_Zero": {
+      "type": "SetAttribute",
+      "attribute": "andv_test_day_from_onset",
+      "value": 0,
+      "direct_transition": "Trajectory_Branch"
+    },
+    "Trajectory_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Asymptomatic fraction: 0-10% — using 5% as central scenario prior.",
+        "Mild (no HCPS): 25%. HCPS trajectory: 70%.",
+        "Severe-case surveillance means true mild/asymptomatic fraction is underestimated."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Asymptomatic_Infection",
+          "distribution": 0.05
+        },
+        {
+          "transition": "Mild_Infection_Onset",
+          "distribution": 0.25
+        },
+        {
+          "transition": "HCPS_Prodrome_Onset",
+          "distribution": 0.70
+        }
+      ]
+    },
+    "Asymptomatic_Infection": {
+      "type": "SetAttribute",
+      "attribute": "andv_trajectory",
+      "value": "asymptomatic",
+      "direct_transition": "Hantavirus_Condition_Onset_Asymptomatic"
+    },
+    "Hantavirus_Condition_Onset_Asymptomatic": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED 76690009: Hantavirus infection (disorder). Verify against current SNOMED release."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "76690009",
+          "display": "Hantavirus infection (disorder)"
+        }
+      ],
+      "assign_to_attribute": "andv_hantavirus_condition",
+      "direct_transition": "Call_Diagnostics_Asymptomatic"
+    },
+    "Call_Diagnostics_Asymptomatic": {
+      "type": "CallSubmodule",
+      "submodule": "andv/andv_diagnostics",
+      "direct_transition": "Asymptomatic_Recovery"
+    },
+    "Asymptomatic_Recovery": {
+      "type": "ConditionEnd",
+      "referenced_by_attribute": "andv_hantavirus_condition",
+      "direct_transition": "Terminal"
+    },
+    "Mild_Infection_Onset": {
+      "type": "SetAttribute",
+      "attribute": "andv_trajectory",
+      "value": "mild",
+      "direct_transition": "Mild_Prodrome_Encounter"
+    },
+    "Mild_Prodrome_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "ambulatory",
+      "reason": "Hantavirus_Condition_Onset_Mild",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Hantavirus_Condition_Onset_Mild"
+    },
+    "Hantavirus_Condition_Onset_Mild": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED 76690009: Hantavirus infection (disorder).",
+        "Runs after Mild_Prodrome_Encounter so the encounter is already open and in the list",
+        "when conditionStart() fires — avoids stale-lock mis-diagnosis into a prior encounter."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "76690009",
+          "display": "Hantavirus infection (disorder)"
+        }
+      ],
+      "assign_to_attribute": "andv_hantavirus_condition",
+      "target_encounter": "Mild_Prodrome_Encounter",
+      "direct_transition": "Symptom_Fever"
+    },
+    "Symptom_Fever": {
+      "type": "Symptom",
+      "symptom": "Fever",
+      "range": {
+        "low": 50,
+        "high": 200
+      },
+      "direct_transition": "Symptom_Myalgia"
+    },
+    "Symptom_Myalgia": {
+      "type": "Symptom",
+      "symptom": "Myalgia",
+      "range": {
+        "low": 50,
+        "high": 200
+      },
+      "direct_transition": "Symptom_Malaise"
+    },
+    "Symptom_Malaise": {
+      "type": "Symptom",
+      "symptom": "Malaise",
+      "range": {
+        "low": 30,
+        "high": 150
+      },
+      "direct_transition": "Symptom_Headache"
+    },
+    "Symptom_Headache": {
+      "type": "Symptom",
+      "symptom": "Headache",
+      "range": {
+        "low": 30,
+        "high": 150
+      },
+      "direct_transition": "Symptom_Nausea"
+    },
+    "Symptom_Nausea": {
+      "type": "Symptom",
+      "symptom": "Nausea",
+      "range": {
+        "low": 30,
+        "high": 150
+      },
+      "direct_transition": "Symptom_Diarrhea"
+    },
+    "Symptom_Diarrhea": {
+      "type": "Symptom",
+      "symptom": "Diarrhea",
+      "range": {
+        "low": 20,
+        "high": 100
+      },
+      "direct_transition": "Symptom_Abdominal_Pain"
+    },
+    "Symptom_Abdominal_Pain": {
+      "type": "Symptom",
+      "symptom": "Abdominal Pain",
+      "range": {
+        "low": 20,
+        "high": 100
+      },
+      "direct_transition": "End_Mild_Encounter"
+    },
+    "End_Mild_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Mild_Prodrome_Delay"
+    },
+    "Mild_Prodrome_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Prodrome duration 2-8 days before either recovery or HCPS decompensation."
+      ],
+      "range": {
+        "low": 2,
+        "high": 8,
+        "unit": "days"
+      },
+      "direct_transition": "Call_Diagnostics_Mild"
+    },
+    "Call_Diagnostics_Mild": {
+      "type": "CallSubmodule",
+      "submodule": "andv/andv_diagnostics",
+      "direct_transition": "Mild_Recovery"
+    },
+    "Mild_Recovery": {
+      "type": "ConditionEnd",
+      "referenced_by_attribute": "andv_hantavirus_condition",
+      "direct_transition": "Clear_Symptoms"
+    },
+    "Clear_Symptoms": {
+      "type": "Symptom",
+      "symptom": "Fever",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "Terminal"
+    },
+    "HCPS_Prodrome_Onset": {
+      "type": "SetAttribute",
+      "attribute": "andv_trajectory",
+      "value": "hcps",
+      "direct_transition": "HCPS_Prodrome_Encounter"
+    },
+    "HCPS_Prodrome_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "ambulatory",
+      "reason": "Hantavirus_Condition_Onset_HCPS",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Hantavirus_Condition_Onset_HCPS"
+    },
+    "Hantavirus_Condition_Onset_HCPS": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED 76690009: Hantavirus infection (disorder).",
+        "Runs after HCPS_Prodrome_Encounter so the encounter is already open and in the list",
+        "when conditionStart() fires — avoids stale-lock mis-diagnosis into a prior encounter.",
+        "HCPS-specific condition onset happens in andv_hcps_course."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "76690009",
+          "display": "Hantavirus infection (disorder)"
+        }
+      ],
+      "assign_to_attribute": "andv_hantavirus_condition",
+      "target_encounter": "HCPS_Prodrome_Encounter",
+      "direct_transition": "HCPS_Symptom_Fever"
+    },
+    "HCPS_Symptom_Fever": {
+      "type": "Symptom",
+      "symptom": "Fever",
+      "range": {
+        "low": 75,
+        "high": 300
+      },
+      "direct_transition": "HCPS_Symptom_Myalgia"
+    },
+    "HCPS_Symptom_Myalgia": {
+      "type": "Symptom",
+      "symptom": "Myalgia",
+      "range": {
+        "low": 75,
+        "high": 300
+      },
+      "direct_transition": "HCPS_Symptom_Malaise"
+    },
+    "HCPS_Symptom_Malaise": {
+      "type": "Symptom",
+      "symptom": "Malaise",
+      "range": {
+        "low": 50,
+        "high": 250
+      },
+      "direct_transition": "HCPS_Symptom_Headache"
+    },
+    "HCPS_Symptom_Headache": {
+      "type": "Symptom",
+      "symptom": "Headache",
+      "range": {
+        "low": 50,
+        "high": 250
+      },
+      "direct_transition": "HCPS_Symptom_Nausea"
+    },
+    "HCPS_Symptom_Nausea": {
+      "type": "Symptom",
+      "symptom": "Nausea",
+      "range": {
+        "low": 50,
+        "high": 200
+      },
+      "direct_transition": "HCPS_Symptom_Diarrhea"
+    },
+    "HCPS_Symptom_Diarrhea": {
+      "type": "Symptom",
+      "symptom": "Diarrhea",
+      "range": {
+        "low": 30,
+        "high": 150
+      },
+      "direct_transition": "HCPS_Symptom_Abdominal_Pain"
+    },
+    "HCPS_Symptom_Abdominal_Pain": {
+      "type": "Symptom",
+      "symptom": "Abdominal Pain",
+      "range": {
+        "low": 30,
+        "high": 150
+      },
+      "direct_transition": "End_HCPS_Prodrome_Encounter"
+    },
+    "End_HCPS_Prodrome_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "HCPS_Prodrome_Delay"
+    },
+    "HCPS_Prodrome_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Prodrome lasts 2-8 days before abrupt cardiopulmonary decompensation.",
+        "Capillary-leak physiology develops rapidly over hours to days."
+      ],
+      "range": {
+        "low": 2,
+        "high": 8,
+        "unit": "days"
+      },
+      "direct_transition": "Set_Onset_Day_Prodrome_Done"
+    },
+    "Set_Onset_Day_Prodrome_Done": {
+      "type": "SetAttribute",
+      "attribute": "andv_test_day_from_onset",
+      "range": {
+        "low": 2,
+        "high": 8
+      },
+      "direct_transition": "Call_Diagnostics_HCPS"
+    },
+    "Call_Diagnostics_HCPS": {
+      "type": "CallSubmodule",
+      "submodule": "andv/andv_diagnostics",
+      "direct_transition": "Call_HCPS_Course"
+    },
+    "Call_HCPS_Course": {
+      "type": "CallSubmodule",
+      "submodule": "andv/andv_hcps_course",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}

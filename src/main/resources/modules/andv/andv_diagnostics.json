@@ -1,0 +1,487 @@
+{
+  "name": "andv_diagnostics",
+  "remarks": [
+    "ANDV Diagnostics Submodule",
+    "",
+    "Simulates day-dependent test positivity for two primary Andes virus assays:",
+    "  1. IgM ELISA (serum/plasma) — front-line acute confirmation",
+    "  2. RT-qPCR on buffy coat / nucleated blood cells — early confirmation",
+    "",
+    "Diagnostic realism from the PDF design brief and clinical literature:",
+    "  - Early false-negatives are clinically significant: CDC 2026 HAN notice warns",
+    "    very early diagnosis (<72h) is difficult. Repeat testing recommended at ~72h",
+    "    if initial result is negative and suspicion remains high.",
+    "  - RT-qPCR: 94.9% sensitivity / 100% specificity on peripheral blood cells;",
+    "    100% of buffy coats positive in acute phase (2024 Chile cohort, PubMed 26508102),",
+    "    still 95% positive at day 17, 93% at days 23-29.",
+    "  - IgM ELISA: reported 100% sensitivity/specificity in first available sample",
+    "    in Andes-specific assay (one early evaluation). Near-universal positive",
+    "    once patient is in clinically compatible symptomatic illness.",
+    "",
+    "Attributes read:   andv_test_day_from_onset (integer)",
+    "Attributes set:",
+    "  andv_pcr_result        : 'positive' | 'negative'",
+    "  andv_igm_result        : 'positive' | 'negative'",
+    "  andv_repeat_test_due   : true (set when early negative — prompts repeat testing)",
+    "",
+    "LOINC codes marked TBD require verification against current LOINC release.",
+    "Candidate codes (verify before production use):",
+    "  Hantavirus IgM Ab:  22295-5  'Hantavirus IgM Ab [Titer] in Serum by Immunoassay'",
+    "  Hantavirus RNA PCR: 25399-2  'Hantavirus RNA [Presence] in Serum by Probe'",
+    "",
+    "References:",
+    "  - CDC 2026 HAN notice HAN00528",
+    "  - PubMed 26508102 (2024 Chile RT-qPCR buffy coat cohort)",
+    "  - WHO/PAHO hantavirus outbreak toolbox"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Diagnostic_Encounter"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Diagnostic_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "ambulatory",
+      "reason": "andv_hantavirus_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Early_Test_Check"
+    },
+    "Early_Test_Check": {
+      "type": "Simple",
+      "remarks": [
+        "Branch on whether we are in the early (<3 days post-onset) window where",
+        "false-negatives are common, per CDC 2026 HAN notice guidance."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "andv_test_day_from_onset",
+            "operator": "<",
+            "value": 3
+          },
+          "transition": "Early_PCR_Branch"
+        },
+        {
+          "transition": "Standard_PCR_Branch"
+        }
+      ]
+    },
+    "Early_PCR_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Very early illness (<72h): PCR sensitivity substantially reduced.",
+        "Using 60% positive, 40% false-negative as a scenario prior.",
+        "IgM may also be undetectable this early."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "PCR_Positive",
+          "distribution": 0.60
+        },
+        {
+          "transition": "PCR_Negative_Early",
+          "distribution": 0.40
+        }
+      ]
+    },
+    "Standard_PCR_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Day 3+ post-onset: 94.9-100% sensitivity on buffy coat per clinical data.",
+        "Using 95% positive, 5% negative to capture rare test failures."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "PCR_Positive",
+          "distribution": 0.95
+        },
+        {
+          "transition": "PCR_Negative_Late",
+          "distribution": 0.05
+        }
+      ]
+    },
+    "PCR_Positive": {
+      "type": "DiagnosticReport",
+      "remarks": [
+        "RT-qPCR on buffy coat / nucleated blood cells.",
+        "LOINC 25399-2: verify against current LOINC release."
+      ],
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "25399-2",
+          "display": "Hantavirus RNA [Presence] in Serum by Probe"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "25399-2",
+              "display": "Hantavirus RNA [Presence] in Serum by Probe"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "260373001",
+            "display": "Detected (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_PCR_Positive"
+    },
+    "Set_PCR_Positive": {
+      "type": "SetAttribute",
+      "attribute": "andv_pcr_result",
+      "value": "positive",
+      "direct_transition": "IgM_ELISA_Branch"
+    },
+    "PCR_Negative_Early": {
+      "type": "DiagnosticReport",
+      "remarks": [
+        "False-negative early result — repeat testing required."
+      ],
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "25399-2",
+          "display": "Hantavirus RNA [Presence] in Serum by Probe"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "25399-2",
+              "display": "Hantavirus RNA [Presence] in Serum by Probe"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "260415000",
+            "display": "Not detected (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_PCR_Negative_Schedule_Repeat"
+    },
+    "Set_PCR_Negative_Schedule_Repeat": {
+      "type": "SetAttribute",
+      "attribute": "andv_pcr_result",
+      "value": "negative",
+      "direct_transition": "Schedule_Repeat_Test"
+    },
+    "Schedule_Repeat_Test": {
+      "type": "SetAttribute",
+      "attribute": "andv_repeat_test_due",
+      "value": true,
+      "direct_transition": "IgM_ELISA_Branch"
+    },
+    "PCR_Negative_Late": {
+      "type": "DiagnosticReport",
+      "remarks": [
+        "Late-stage negative — rare but possible (5% of day-3+ tests)."
+      ],
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "25399-2",
+          "display": "Hantavirus RNA [Presence] in Serum by Probe"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "25399-2",
+              "display": "Hantavirus RNA [Presence] in Serum by Probe"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "260415000",
+            "display": "Not detected (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_PCR_Negative_Late"
+    },
+    "Set_PCR_Negative_Late": {
+      "type": "SetAttribute",
+      "attribute": "andv_pcr_result",
+      "value": "negative",
+      "direct_transition": "IgM_ELISA_Branch"
+    },
+    "IgM_ELISA_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "IgM ELISA: ~100% sensitivity in acute clinically compatible illness.",
+        "Early illness (<72h) may have lower sensitivity; using 90% for early, 100% for late.",
+        "In practice, ELISA and PCR complement each other."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "andv_test_day_from_onset",
+            "operator": "<",
+            "value": 3
+          },
+          "transition": "Early_IgM_Branch"
+        },
+        {
+          "transition": "IgM_Positive"
+        }
+      ]
+    },
+    "Early_IgM_Branch": {
+      "type": "Simple",
+      "distributed_transition": [
+        {
+          "transition": "IgM_Positive",
+          "distribution": 0.90
+        },
+        {
+          "transition": "IgM_Negative",
+          "distribution": 0.10
+        }
+      ]
+    },
+    "IgM_Positive": {
+      "type": "DiagnosticReport",
+      "remarks": [
+        "IgM ELISA — front-line confirmation per CDC.",
+        "LOINC 22295-5: verify against current LOINC release."
+      ],
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "22295-5",
+          "display": "Hantavirus IgM Ab [Titer] in Serum by Immunoassay"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "22295-5",
+              "display": "Hantavirus IgM Ab [Titer] in Serum by Immunoassay"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "10828004",
+            "display": "Positive (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_IgM_Positive"
+    },
+    "Set_IgM_Positive": {
+      "type": "SetAttribute",
+      "attribute": "andv_igm_result",
+      "value": "positive",
+      "direct_transition": "End_Diagnostic_Encounter"
+    },
+    "IgM_Negative": {
+      "type": "DiagnosticReport",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "22295-5",
+          "display": "Hantavirus IgM Ab [Titer] in Serum by Immunoassay"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "22295-5",
+              "display": "Hantavirus IgM Ab [Titer] in Serum by Immunoassay"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "260385009",
+            "display": "Negative (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_IgM_Negative"
+    },
+    "Set_IgM_Negative": {
+      "type": "SetAttribute",
+      "attribute": "andv_igm_result",
+      "value": "negative",
+      "direct_transition": "End_Diagnostic_Encounter"
+    },
+    "End_Diagnostic_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Repeat_Test_Check"
+    },
+    "Repeat_Test_Check": {
+      "type": "Simple",
+      "remarks": [
+        "If early false-negative, simulate repeat testing ~72h later per CDC guidance.",
+        "This models the clinical workflow of 'retest if suspicion remains high'."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "andv_repeat_test_due",
+            "operator": "==",
+            "value": true
+          },
+          "transition": "Repeat_Test_Delay"
+        },
+        {
+          "transition": "Terminal"
+        }
+      ]
+    },
+    "Repeat_Test_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Wait ~72 hours (3 days) before repeat test per CDC HAN notice recommendation."
+      ],
+      "exact": {
+        "quantity": 3,
+        "unit": "days"
+      },
+      "direct_transition": "Clear_Repeat_Flag"
+    },
+    "Clear_Repeat_Flag": {
+      "type": "SetAttribute",
+      "attribute": "andv_repeat_test_due",
+      "value": false,
+      "direct_transition": "Advance_Onset_Day"
+    },
+    "Advance_Onset_Day": {
+      "type": "SetAttribute",
+      "attribute": "andv_test_day_from_onset",
+      "range": {
+        "low": 3,
+        "high": 5
+      },
+      "direct_transition": "Repeat_Diagnostic_Encounter"
+    },
+    "Repeat_Diagnostic_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "ambulatory",
+      "reason": "andv_hantavirus_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Repeat_PCR_Standard"
+    },
+    "Repeat_PCR_Standard": {
+      "type": "DiagnosticReport",
+      "remarks": [
+        "Repeat RT-qPCR at day 3-5: ~95% sensitivity expected."
+      ],
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "25399-2",
+          "display": "Hantavirus RNA [Presence] in Serum by Probe"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "25399-2",
+              "display": "Hantavirus RNA [Presence] in Serum by Probe"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "260373001",
+            "display": "Detected (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_Repeat_PCR_Positive"
+    },
+    "Set_Repeat_PCR_Positive": {
+      "type": "SetAttribute",
+      "attribute": "andv_pcr_result",
+      "value": "positive",
+      "direct_transition": "Repeat_IgM_Positive"
+    },
+    "Repeat_IgM_Positive": {
+      "type": "DiagnosticReport",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "22295-5",
+          "display": "Hantavirus IgM Ab [Titer] in Serum by Immunoassay"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "22295-5",
+              "display": "Hantavirus IgM Ab [Titer] in Serum by Immunoassay"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "10828004",
+            "display": "Positive (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_Repeat_IgM_Positive"
+    },
+    "Set_Repeat_IgM_Positive": {
+      "type": "SetAttribute",
+      "attribute": "andv_igm_result",
+      "value": "positive",
+      "direct_transition": "End_Repeat_Diagnostic_Encounter"
+    },
+    "End_Repeat_Diagnostic_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}

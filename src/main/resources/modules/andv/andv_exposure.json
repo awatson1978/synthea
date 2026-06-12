@@ -1,0 +1,108 @@
+{
+  "name": "andv_exposure",
+  "remarks": [
+    "ANDV Exposure Assignment Submodule",
+    "",
+    "Assigns exposure mode (rodent-borne vs. person-to-person) and, for person-to-person",
+    "cases, the contact intimacy tier. Sets attributes consumed by downstream submodules.",
+    "",
+    "Epidemiologic basis:",
+    "  - WHO/CDC describe rodent exposure as the primary route (~90-99% of cases).",
+    "  - Person-to-person spread is documented only for Andes virus, limited to close/",
+    "    prolonged contact (household, intimate). Healthcare-associated cases are rare.",
+    "  - Transmission most efficient during prodromal / early symptomatic phase.",
+    "",
+    "Attributes set:",
+    "  andv_exposure_mode       : 'rodent' | 'person_to_person'",
+    "  andv_human_contact_tier  : 'intimate' | 'household' | 'casual' (p2p only)",
+    "",
+    "References:",
+    "  - CDC Andes Virus page; WHO Hantavirus fact sheet 2026",
+    "  - Shedding study: PubMed 26508102 (100% buffy coat positivity in acute phase)"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Assign_Exposure_Mode"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Assign_Exposure_Mode": {
+      "type": "Simple",
+      "remarks": [
+        "95% rodent-borne (Oligoryzomys longicaudatus contact), 5% person-to-person.",
+        "Scenario prior — adjust for cluster outbreak scenarios."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Rodent_Exposure",
+          "distribution": 0.95
+        },
+        {
+          "transition": "Person_To_Person_Exposure",
+          "distribution": 0.05
+        }
+      ]
+    },
+    "Rodent_Exposure": {
+      "type": "SetAttribute",
+      "attribute": "andv_exposure_mode",
+      "value": "rodent",
+      "direct_transition": "Call_Incubation_Submodule"
+    },
+    "Person_To_Person_Exposure": {
+      "type": "SetAttribute",
+      "attribute": "andv_exposure_mode",
+      "value": "person_to_person",
+      "direct_transition": "Assign_Contact_Tier"
+    },
+    "Assign_Contact_Tier": {
+      "type": "Simple",
+      "remarks": [
+        "Risk stratification by contact intensity. Intimate partners have the highest",
+        "per-contact risk; household contacts moderate; casual contacts the lowest.",
+        "Chilean household-contact study: 16/476 contacts developed HCPS,",
+        "with risk much higher for sex partners than other household contacts."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Set_Intimate_Tier",
+          "distribution": 0.20
+        },
+        {
+          "transition": "Set_Household_Tier",
+          "distribution": 0.50
+        },
+        {
+          "transition": "Set_Casual_Tier",
+          "distribution": 0.30
+        }
+      ]
+    },
+    "Set_Intimate_Tier": {
+      "type": "SetAttribute",
+      "attribute": "andv_human_contact_tier",
+      "value": "intimate",
+      "direct_transition": "Call_Incubation_Submodule"
+    },
+    "Set_Household_Tier": {
+      "type": "SetAttribute",
+      "attribute": "andv_human_contact_tier",
+      "value": "household",
+      "direct_transition": "Call_Incubation_Submodule"
+    },
+    "Set_Casual_Tier": {
+      "type": "SetAttribute",
+      "attribute": "andv_human_contact_tier",
+      "value": "casual",
+      "direct_transition": "Call_Incubation_Submodule"
+    },
+    "Call_Incubation_Submodule": {
+      "type": "CallSubmodule",
+      "submodule": "andv/andv_incubation_prodrome",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}
