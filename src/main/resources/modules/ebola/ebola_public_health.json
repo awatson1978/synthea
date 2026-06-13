@@ -1,0 +1,374 @@
+{
+  "name": "ebola_public_health",
+  "remarks": [
+    "Ebola Public Health Overlay Submodule",
+    "",
+    "Encodes post-discharge public-health response for EVD survivors:",
+    "isolation care plan, contact tracing, ring vaccination (Zaire only),",
+    "21-day contact monitoring, and survivor follow-up.",
+    "",
+    "Called only from the recovery path of ebola_clinical_course — all patients",
+    "who reach this module are survivors.",
+    "",
+    "Key interventions encoded:",
+    "  - Isolation care plan with airborne + contact precautions",
+    "  - Mandatory public health notification",
+    "  - Ring vaccination notification (Zaire species only):",
+    "      ERVEBO (rVSV-ZEBOV-GP): WHO-recommended, single dose, high efficacy.",
+    "      No licensed reactive vaccine for Sudan or Bundibugyo (2026).",
+    "  - 21-day contact follow-up period (WHO/CDC: contacts monitored for 21 days",
+    "      after last exposure — the maximum incubation period)",
+    "  - Survivor care plan for post-Ebola syndrome and semen testing counseling",
+    "      (WHO guidance: sexual transmission documented up to 15 months post-recovery;",
+    "       semen testing starts at 3 months, continues to 2 consecutive negatives)",
+    "",
+    "Attributes set:",
+    "  ebola_contact_tracing_status : 'initiated' -> 'completed'",
+    "  ebola_isolation_active       : true -> false",
+    "  ebola_ring_vax_ordered       : true (Zaire only — documents notification to contacts)",
+    "",
+    "SNOMED codes marked 'verify' need confirmation against current release.",
+    "Confirmed codes (used in existing Synthea modules or ANDV module):",
+    "  734163000  Care plan (record artifact)",
+    "  409524006  Airborne precautions (procedure)",
+    "  409526008  Contact precautions (procedure)",
+    "  225344000  Use of personal protective equipment (procedure)",
+    "  416940007  Mandatory notification of disease (procedure)",
+    "",
+    "References:",
+    "  - WHO EVD fact sheet 2025; WHO IPC guidance for EVD",
+    "  - CDC EVD public health strategy; CDC contact definition and monitoring",
+    "  - Guinea ring-vaccination trial (Lancet 2017); SAGE/CDC ERVEBO recommendation",
+    "  - WHO survivor guidance: sexual transmission and semen testing"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Set_Isolation_Active"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Set_Isolation_Active": {
+      "type": "SetAttribute",
+      "attribute": "ebola_isolation_active",
+      "value": true,
+      "direct_transition": "Isolation_Encounter"
+    },
+    "Isolation_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "inpatient",
+      "reason": "ebola_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Isolation_Care_Plan"
+    },
+    "Isolation_Care_Plan": {
+      "type": "CarePlanStart",
+      "remarks": [
+        "Full IPC care plan: airborne + contact precautions + PPE.",
+        "Applies to HCWs and any household contacts during isolation period.",
+        "SNOMED 734163000: Care plan (record artifact) — confirmed in existing modules."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "734163000",
+          "display": "Care plan (record artifact)"
+        }
+      ],
+      "reason": "ebola_condition",
+      "activities": [
+        {
+          "system": "SNOMED-CT",
+          "code": "409524006",
+          "display": "Airborne precautions (procedure)"
+        },
+        {
+          "system": "SNOMED-CT",
+          "code": "409526008",
+          "display": "Contact precautions (procedure)"
+        }
+      ],
+      "direct_transition": "PPE_Procedure"
+    },
+    "PPE_Procedure": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "225344000",
+          "display": "Use of personal protective equipment (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 30,
+        "high": 30,
+        "unit": "minutes"
+      },
+      "reason": "ebola_condition",
+      "direct_transition": "Public_Health_Notification"
+    },
+    "Public_Health_Notification": {
+      "type": "Procedure",
+      "remarks": [
+        "Mandatory notification to public health authorities per WHO/CDC guidance.",
+        "Triggers contact listing and ring vaccination logistics for Zaire species."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "416940007",
+          "display": "Mandatory notification of disease (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 30,
+        "high": 30,
+        "unit": "minutes"
+      },
+      "reason": "ebola_condition",
+      "direct_transition": "Set_Contact_Tracing_Initiated"
+    },
+    "Set_Contact_Tracing_Initiated": {
+      "type": "SetAttribute",
+      "attribute": "ebola_contact_tracing_status",
+      "value": "initiated",
+      "direct_transition": "Ring_Vaccination_Check"
+    },
+    "Ring_Vaccination_Check": {
+      "type": "Simple",
+      "remarks": [
+        "ERVEBO ring vaccination recommended only for Zaire ebolavirus outbreaks.",
+        "No licensed reactive vaccine for Sudan or Bundibugyo (WHO 2026).",
+        "This state records the notification/ordering of ring vaccination for contacts —",
+        "the patient themselves has already recovered; this documents the public-health action."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_species",
+            "operator": "==",
+            "value": "zaire"
+          },
+          "transition": "Ring_Vaccination_Encounter"
+        },
+        {
+          "transition": "End_Isolation_Encounter"
+        }
+      ]
+    },
+    "Ring_Vaccination_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "ambulatory",
+      "reason": "ebola_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "ERVEBO_Notification_Procedure"
+    },
+    "ERVEBO_Notification_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "Documents that ring vaccination with ERVEBO was ordered/initiated for identified",
+        "contacts of this confirmed Zaire EVD case.",
+        "ERVEBO (rVSV-ZEBOV-GP): single-dose, WHO-recommended; SAGE endorsed 2020.",
+        "CVX 213: rVSV-ZEBOV-GP Ebola vaccine. Verify CVX code against current registry."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "416940007",
+          "display": "Mandatory notification of disease (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 30,
+        "high": 60,
+        "unit": "minutes"
+      },
+      "reason": "ebola_condition",
+      "direct_transition": "Set_Ring_Vax_Ordered"
+    },
+    "Set_Ring_Vax_Ordered": {
+      "type": "SetAttribute",
+      "attribute": "ebola_ring_vax_ordered",
+      "value": true,
+      "direct_transition": "End_Ring_Vax_Encounter"
+    },
+    "End_Ring_Vax_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "End_Isolation_Encounter"
+    },
+    "End_Isolation_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Contact_Monitoring_Period"
+    },
+    "Contact_Monitoring_Period": {
+      "type": "Delay",
+      "remarks": [
+        "21-day monitoring period per WHO/CDC: contacts followed for 21 days after",
+        "last exposure (maximum incubation period for all Ebola species).",
+        "This is shorter than ANDV (42 days) — Ebola incubation max is 21 days."
+      ],
+      "exact": {
+        "quantity": 21,
+        "unit": "days"
+      },
+      "direct_transition": "Set_Contact_Tracing_Completed"
+    },
+    "Set_Contact_Tracing_Completed": {
+      "type": "SetAttribute",
+      "attribute": "ebola_contact_tracing_status",
+      "value": "completed",
+      "direct_transition": "Set_Isolation_Inactive"
+    },
+    "Set_Isolation_Inactive": {
+      "type": "SetAttribute",
+      "attribute": "ebola_isolation_active",
+      "value": false,
+      "direct_transition": "Survivor_Followup_Encounter"
+    },
+    "Survivor_Followup_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "ambulatory",
+      "reason": "ebola_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Survivor_Care_Plan"
+    },
+    "Survivor_Care_Plan": {
+      "type": "CarePlanStart",
+      "remarks": [
+        "Post-Ebola syndrome monitoring and survivor support.",
+        "WHO guidance: survivors may experience fatigue, musculoskeletal pain,",
+        "ocular disease, and neurologic symptoms for months after recovery.",
+        "Male survivors: sexual transmission documented up to 15 months post-recovery.",
+        "WHO recommends semen testing at 3 months, continuing to 2 negative results."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "734163000",
+          "display": "Care plan (record artifact)"
+        }
+      ],
+      "reason": "ebola_condition",
+      "activities": [
+        {
+          "system": "SNOMED-CT",
+          "code": "225344000",
+          "display": "Use of personal protective equipment (procedure)"
+        }
+      ],
+      "direct_transition": "End_Isolation_Care_Plan"
+    },
+    "End_Isolation_Care_Plan": {
+      "type": "CarePlanEnd",
+      "careplan": "Isolation_Care_Plan",
+      "direct_transition": "End_Survivor_Followup_Encounter"
+    },
+    "End_Survivor_Followup_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Semen_Testing_Check"
+    },
+    "Semen_Testing_Check": {
+      "type": "Simple",
+      "remarks": [
+        "WHO recommends semen testing for male survivors starting at 3 months.",
+        "Modeled as a 3-month delay then a counseling/testing encounter.",
+        "Female survivors and children do not require semen testing."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Gender",
+            "gender": "M"
+          },
+          "transition": "Semen_Testing_Delay"
+        },
+        {
+          "transition": "Terminal"
+        }
+      ]
+    },
+    "Semen_Testing_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "WHO guidance: semen testing begins at 3 months post-recovery."
+      ],
+      "exact": {
+        "quantity": 3,
+        "unit": "months"
+      },
+      "direct_transition": "Semen_Testing_Encounter"
+    },
+    "Semen_Testing_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "ambulatory",
+      "reason": "ebola_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Semen_Testing_Observation"
+    },
+    "Semen_Testing_Observation": {
+      "type": "Observation",
+      "category": "laboratory",
+      "unit": "",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "88193-0",
+          "display": "Ebolavirus RNA [Presence] in Blood by NAA with probe detection"
+        }
+      ],
+      "remarks": [
+        "Semen Ebolavirus RNA testing — survivor sexual transmission risk counseling.",
+        "Using blood PCR code as placeholder; semen-specific LOINC should be verified.",
+        "Modeled as negative (cleared virus) for recovered patients."
+      ],
+      "value_code": {
+        "system": "SNOMED-CT",
+        "code": "260415000",
+        "display": "Not detected (qualifier value)"
+      },
+      "direct_transition": "Set_Male_Semen_Followup"
+    },
+    "Set_Male_Semen_Followup": {
+      "type": "SetAttribute",
+      "attribute": "ebola_male_semen_followup",
+      "value": true,
+      "direct_transition": "End_Semen_Testing_Encounter"
+    },
+    "End_Semen_Testing_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "End_Survivor_Care_Plan"
+    },
+    "End_Survivor_Care_Plan": {
+      "type": "CarePlanEnd",
+      "careplan": "Survivor_Care_Plan",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}

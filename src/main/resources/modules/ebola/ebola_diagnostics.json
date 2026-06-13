@@ -1,0 +1,445 @@
+{
+  "name": "ebola_diagnostics",
+  "remarks": [
+    "Ebola Diagnostics Submodule",
+    "",
+    "Simulates RT-PCR and antigen-RDT diagnostics with day-dependent positivity.",
+    "CDC lab guidance: Ebola virus is detectable in blood only after symptom onset,",
+    "and it may take up to 3 days after symptoms appear to reach detectable levels.",
+    "A negative specimen collected within 3 days of onset is indeterminate — repeat",
+    "testing is required before a case can be discarded.",
+    "",
+    "Case classification logic (WHO definitions):",
+    "  suspected → PCR positive   → confirmed",
+    "  suspected → PCR negative (early) → indeterminate, repeat required",
+    "  suspected → PCR negative (day 3+) → discarded",
+    "",
+    "Antigen RDT (OraQuick Ebola Rapid Antigen Test):",
+    "  Presumptive tool only — not for asymptomatic screening.",
+    "  Modeled as an optional fast branch that can accelerate isolation.",
+    "  Still feeds into confirmatory PCR pathway.",
+    "",
+    "Attributes read:   ebola_symptom_day",
+    "Attributes set:",
+    "  ebola_pcr_result       : 'positive' | 'negative'",
+    "  ebola_rdt_result       : 'positive' | 'negative' (if RDT performed)",
+    "  ebola_repeat_test_due  : true when early false-negative triggers repeat",
+    "  ebola_case_status      : 'confirmed' | 'discarded' (updates from 'suspected')",
+    "",
+    "LOINC codes require verification against current release:",
+    "  Ebolavirus RNA PCR: 88193-0 'Ebolavirus RNA [Presence] in Blood by NAA' (verify)",
+    "  Ebolavirus antigen: PLACEHOLDER — search LOINC for 'Ebolavirus Ag'",
+    "",
+    "References:",
+    "  - CDC EVD lab guidance; CDC HAN 2014 diagnostic update",
+    "  - OraQuick Ebola Rapid Antigen Test field evaluations (CDC/WHO)",
+    "  - WHO case definition toolbox 2019"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Diagnostic_Encounter"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Diagnostic_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "ambulatory",
+      "reason": "ebola_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Collect_PCR_Specimen"
+    },
+    "Collect_PCR_Specimen": {
+      "type": "Procedure",
+      "remarks": [
+        "Blood specimen collection for Ebola RT-PCR per CDC/WHO protocol.",
+        "SNOMED 396550006: Blood specimen collection (procedure) — verify."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "396550006",
+          "display": "Blood specimen collection (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 15,
+        "high": 30,
+        "unit": "minutes"
+      },
+      "reason": "ebola_condition",
+      "direct_transition": "Early_Test_Check"
+    },
+    "Early_Test_Check": {
+      "type": "Simple",
+      "remarks": [
+        "CDC: virus may take up to 3 days after symptoms to reach detectable levels.",
+        "Early tests (symptom day 0-2) have substantially lower sensitivity."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_symptom_day",
+            "operator": "<",
+            "value": 3
+          },
+          "transition": "Early_PCR_Branch"
+        },
+        {
+          "transition": "Standard_PCR_Branch"
+        }
+      ]
+    },
+    "Early_PCR_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Symptom days 0-2: sensitivity substantially reduced.",
+        "70% positive (high viremia even early), 30% false-negative/indeterminate.",
+        "A negative result at this stage triggers mandatory repeat at day 3+."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "PCR_Positive",
+          "distribution": 0.70
+        },
+        {
+          "transition": "PCR_Negative_Early",
+          "distribution": 0.30
+        }
+      ]
+    },
+    "Standard_PCR_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Symptom day 3+: RT-PCR on blood has high sensitivity.",
+        "95% positive, 5% negative (technical failure or very late mild illness)."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "PCR_Positive",
+          "distribution": 0.95
+        },
+        {
+          "transition": "PCR_Negative_Late",
+          "distribution": 0.05
+        }
+      ]
+    },
+    "PCR_Positive": {
+      "type": "DiagnosticReport",
+      "remarks": [
+        "RT-PCR on whole blood — principal confirmatory test per CDC/WHO.",
+        "LOINC 88193-0: Ebolavirus RNA [Presence] in Blood by NAA with probe detection. Verify."
+      ],
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "88193-0",
+          "display": "Ebolavirus RNA [Presence] in Blood by NAA with probe detection"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "88193-0",
+              "display": "Ebolavirus RNA [Presence] in Blood by NAA with probe detection"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "260373001",
+            "display": "Detected (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_PCR_Positive"
+    },
+    "Set_PCR_Positive": {
+      "type": "SetAttribute",
+      "attribute": "ebola_pcr_result",
+      "value": "positive",
+      "direct_transition": "Set_Case_Status_Confirmed"
+    },
+    "Set_Case_Status_Confirmed": {
+      "type": "SetAttribute",
+      "attribute": "ebola_case_status",
+      "value": "confirmed",
+      "direct_transition": "Antigen_RDT_Check"
+    },
+    "PCR_Negative_Early": {
+      "type": "DiagnosticReport",
+      "remarks": [
+        "Early false-negative — indeterminate result, NOT a discarded case.",
+        "Repeat testing is mandatory before a case can be ruled out."
+      ],
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "88193-0",
+          "display": "Ebolavirus RNA [Presence] in Blood by NAA with probe detection"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "88193-0",
+              "display": "Ebolavirus RNA [Presence] in Blood by NAA with probe detection"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "260415000",
+            "display": "Not detected (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_PCR_Negative_Early"
+    },
+    "Set_PCR_Negative_Early": {
+      "type": "SetAttribute",
+      "attribute": "ebola_pcr_result",
+      "value": "negative",
+      "direct_transition": "Schedule_Repeat_Test"
+    },
+    "Schedule_Repeat_Test": {
+      "type": "SetAttribute",
+      "attribute": "ebola_repeat_test_due",
+      "value": true,
+      "direct_transition": "Antigen_RDT_Check"
+    },
+    "PCR_Negative_Late": {
+      "type": "DiagnosticReport",
+      "remarks": [
+        "Day 3+ negative — case can be discarded if epidemiologic link is weak.",
+        "Rare outcome (5%): late-stage technical failure or non-EVD diagnosis."
+      ],
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "88193-0",
+          "display": "Ebolavirus RNA [Presence] in Blood by NAA with probe detection"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "88193-0",
+              "display": "Ebolavirus RNA [Presence] in Blood by NAA with probe detection"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "260415000",
+            "display": "Not detected (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_PCR_Negative_Discard"
+    },
+    "Set_PCR_Negative_Discard": {
+      "type": "SetAttribute",
+      "attribute": "ebola_pcr_result",
+      "value": "negative",
+      "direct_transition": "Set_Case_Status_Discarded"
+    },
+    "Set_Case_Status_Discarded": {
+      "type": "SetAttribute",
+      "attribute": "ebola_case_status",
+      "value": "discarded",
+      "direct_transition": "End_Diagnostic_Encounter"
+    },
+    "Antigen_RDT_Check": {
+      "type": "Simple",
+      "remarks": [
+        "Antigen RDT performed as optional fast presumptive test in outbreak settings.",
+        "CDC/HAN: OraQuick Ebola RDT is for symptomatic patients with risk factors,",
+        "NOT for asymptomatic screening. Modeled as 60% uptake in outbreak settings."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Antigen_RDT_Positive",
+          "distribution": 0.60
+        },
+        {
+          "transition": "End_Diagnostic_Encounter",
+          "distribution": 0.40
+        }
+      ]
+    },
+    "Antigen_RDT_Positive": {
+      "type": "DiagnosticReport",
+      "remarks": [
+        "Antigen RDT result — presumptive positive consistent with PCR pathway.",
+        "LOINC for Ebolavirus Ag in Blood: verify against current LOINC release.",
+        "Placeholder code used — search LOINC for 'Ebolavirus Ag [Presence]'."
+      ],
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "41461-5",
+          "display": "Virus identified in Specimen"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "41461-5",
+              "display": "Virus identified in Specimen"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "10828004",
+            "display": "Positive (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_RDT_Positive"
+    },
+    "Set_RDT_Positive": {
+      "type": "SetAttribute",
+      "attribute": "ebola_rdt_result",
+      "value": "positive",
+      "direct_transition": "End_Diagnostic_Encounter"
+    },
+    "End_Diagnostic_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Repeat_Test_Check"
+    },
+    "Repeat_Test_Check": {
+      "type": "Simple",
+      "remarks": [
+        "If early false-negative, simulate mandatory repeat testing ~72h later.",
+        "This models CDC guidance: do not discard a case based on early negative alone."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_repeat_test_due",
+            "operator": "==",
+            "value": true
+          },
+          "transition": "Repeat_Test_Delay"
+        },
+        {
+          "transition": "Terminal"
+        }
+      ]
+    },
+    "Repeat_Test_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Wait 72 hours (3 days) before repeat test per CDC guidance.",
+        "Patient remains in isolation during this window."
+      ],
+      "exact": {
+        "quantity": 3,
+        "unit": "days"
+      },
+      "direct_transition": "Clear_Repeat_Flag"
+    },
+    "Clear_Repeat_Flag": {
+      "type": "SetAttribute",
+      "attribute": "ebola_repeat_test_due",
+      "value": false,
+      "direct_transition": "Advance_Symptom_Day"
+    },
+    "Advance_Symptom_Day": {
+      "type": "SetAttribute",
+      "attribute": "ebola_symptom_day",
+      "range": {
+        "low": 3,
+        "high": 5
+      },
+      "direct_transition": "Repeat_Diagnostic_Encounter"
+    },
+    "Repeat_Diagnostic_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "ambulatory",
+      "reason": "ebola_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Repeat_PCR"
+    },
+    "Repeat_PCR": {
+      "type": "DiagnosticReport",
+      "remarks": [
+        "Repeat RT-PCR at day 3-5 post-onset: high sensitivity expected.",
+        "Modeled as universally positive (patient is symptomatic EVD)."
+      ],
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "88193-0",
+          "display": "Ebolavirus RNA [Presence] in Blood by NAA with probe detection"
+        }
+      ],
+      "observations": [
+        {
+          "category": "laboratory",
+          "unit": "",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "88193-0",
+              "display": "Ebolavirus RNA [Presence] in Blood by NAA with probe detection"
+            }
+          ],
+          "value_code": {
+            "system": "SNOMED-CT",
+            "code": "260373001",
+            "display": "Detected (qualifier value)"
+          }
+        }
+      ],
+      "direct_transition": "Set_Repeat_PCR_Positive"
+    },
+    "Set_Repeat_PCR_Positive": {
+      "type": "SetAttribute",
+      "attribute": "ebola_pcr_result",
+      "value": "positive",
+      "direct_transition": "Set_Case_Status_Confirmed_Repeat"
+    },
+    "Set_Case_Status_Confirmed_Repeat": {
+      "type": "SetAttribute",
+      "attribute": "ebola_case_status",
+      "value": "confirmed",
+      "direct_transition": "End_Repeat_Diagnostic_Encounter"
+    },
+    "End_Repeat_Diagnostic_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}

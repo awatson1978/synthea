@@ -1,0 +1,158 @@
+{
+  "name": "ebola_exposure",
+  "remarks": [
+    "Ebola Exposure Assignment Submodule",
+    "",
+    "Assigns contact type and checks ring-vaccination status before entering the",
+    "infection pathway. Contact type drives risk stratification and public-health",
+    "response documentation in downstream submodules.",
+    "",
+    "Contact types per WHO case-contact definition:",
+    "  household   — shared living space during infectious period (highest density)",
+    "  healthcare  — HCW without adequate PPE (historically major amplification route)",
+    "  funeral     — body-preparation or mourning contact (high-risk fluid exposure)",
+    "  animal      — bushmeat handling or fruit-bat exposure (initial spillover only)",
+    "  unknown     — epidemiologically unlinked; may represent unrecognized chains",
+    "",
+    "Ring vaccination gate (Zaire only):",
+    "  ERVEBO (rVSV-ZEBOV-GP) is recommended for Zaire ring vaccination.",
+    "  Single-dose; WHO Guinea trial reported ~100% efficacy at 10 days post-vaccination.",
+    "  If ebola_ring_vaccinated == true AND species == 'zaire', 85% of patients are",
+    "  protected and exit without infection (15% vaccine breakthrough modeled).",
+    "  No licensed reactive vaccine exists for Sudan or Bundibugyo species (2026).",
+    "",
+    "Attributes read:   ebola_species, ebola_ring_vaccinated",
+    "Attributes set:    ebola_contact_type",
+    "",
+    "References:",
+    "  - WHO EVD fact sheet 2025; CDC EVD transmission page",
+    "  - Guinea ring-vaccination trial (Lancet 2017); CDC vaccine use summary (SAGE 2020)",
+    "  - WHO Bundibugyo expert consultation 2026 (no licensed reactive vaccine)"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Assign_Contact_Type"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Assign_Contact_Type": {
+      "type": "Simple",
+      "remarks": [
+        "WHO/CDC outbreak data: household and funeral contacts predominate in community",
+        "outbreaks; HCW exposure was a major amplifier in 2014-2016 West Africa epidemic."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Set_Household_Contact",
+          "distribution": 0.40
+        },
+        {
+          "transition": "Set_Healthcare_Contact",
+          "distribution": 0.20
+        },
+        {
+          "transition": "Set_Funeral_Contact",
+          "distribution": 0.20
+        },
+        {
+          "transition": "Set_Animal_Contact",
+          "distribution": 0.10
+        },
+        {
+          "transition": "Set_Unknown_Contact",
+          "distribution": 0.10
+        }
+      ]
+    },
+    "Set_Household_Contact": {
+      "type": "SetAttribute",
+      "attribute": "ebola_contact_type",
+      "value": "household",
+      "direct_transition": "Ring_Vaccination_Gate"
+    },
+    "Set_Healthcare_Contact": {
+      "type": "SetAttribute",
+      "attribute": "ebola_contact_type",
+      "value": "healthcare",
+      "direct_transition": "Ring_Vaccination_Gate"
+    },
+    "Set_Funeral_Contact": {
+      "type": "SetAttribute",
+      "attribute": "ebola_contact_type",
+      "value": "funeral",
+      "direct_transition": "Ring_Vaccination_Gate"
+    },
+    "Set_Animal_Contact": {
+      "type": "SetAttribute",
+      "attribute": "ebola_contact_type",
+      "value": "animal",
+      "direct_transition": "Ring_Vaccination_Gate"
+    },
+    "Set_Unknown_Contact": {
+      "type": "SetAttribute",
+      "attribute": "ebola_contact_type",
+      "value": "unknown",
+      "direct_transition": "Ring_Vaccination_Gate"
+    },
+    "Ring_Vaccination_Gate": {
+      "type": "Simple",
+      "remarks": [
+        "ERVEBO ring vaccination applies only to Zaire ebolavirus outbreaks.",
+        "For Sudan and Bundibugyo, no licensed reactive vaccine exists — proceed directly.",
+        "Vaccine protection modeled as 85% block on symptomatic disease after a",
+        "10-day protection window (SAGE recommendation; Guinea trial efficacy ~100%)."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "And",
+            "conditions": [
+              {
+                "condition_type": "Attribute",
+                "attribute": "ebola_species",
+                "operator": "==",
+                "value": "zaire"
+              },
+              {
+                "condition_type": "Attribute",
+                "attribute": "ebola_ring_vaccinated",
+                "operator": "==",
+                "value": true
+              }
+            ]
+          },
+          "transition": "Vaccine_Breakthrough_Check"
+        },
+        {
+          "transition": "Call_Infection_Submodule"
+        }
+      ]
+    },
+    "Vaccine_Breakthrough_Check": {
+      "type": "Simple",
+      "remarks": [
+        "85% vaccine efficacy for ERVEBO against Zaire EVD (conservative estimate).",
+        "15% breakthrough infection — those continue to the infection pathway.",
+        "Non-breakthrough patients exit cleanly (protected, no clinical record)."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Terminal",
+          "distribution": 0.85
+        },
+        {
+          "transition": "Call_Infection_Submodule",
+          "distribution": 0.15
+        }
+      ]
+    },
+    "Call_Infection_Submodule": {
+      "type": "CallSubmodule",
+      "submodule": "ebola/ebola_infection",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}
