@@ -33,10 +33,10 @@ duration: 10
 charts:
     - filename: telomere_associated_dna_damage.png
       type: line
-      title: "telomere_associated_dna_damage"
+      title: "Telomere-associated DNA damage foci (Talemi2015)"
       axisParamX: time
       axisLabelX: time (s)
-      axisLabelY: ???
+      axisLabelY: level (mixed units)
       #lowerBoundY: -0.05
       #upperBoundY: 0.15
       series:

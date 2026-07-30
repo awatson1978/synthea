@@ -34,10 +34,10 @@ inputs:
 charts:
     - filename: o2_transport_metabolism.png
       type: line
-      title: "o2_transport_metabolism"
+      title: "O2 transport and metabolism (Lai2007)"
       axisParamX: time
-      axisLabelX: time (s?)
-      axisLabelY: ???
+      axisLabelX: time (s)
+      axisLabelY: level (mixed units)
       #lowerBoundY: -0.05
       
       #upperBoundY: 0.15

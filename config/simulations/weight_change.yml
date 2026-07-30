@@ -33,10 +33,10 @@ duration: 600
 charts:
     - filename: weight_change.png
       type: line
-      title: "weight_change"
+      title: "Dynamics of human weight change (ChowHall2008)"
       axisParamX: time
       axisLabelX: time (s)
-      axisLabelY: alpha
+      axisLabelY: level (mixed units)
       #lowerBoundY: -0.05
       #upperBoundY: 0.15
       series:
