@@ -16,6 +16,10 @@ stepSize: 0.01
 # Simulation duration in hours (3 weeks total)
 duration: 504
 
+# Also emit a FHIR R4 Bundle of sampled Observations to output/.../{name}.fhir.json
+exportFhir: true
+fhirUnit: "1"
+
 ## Model parameter inputs. Any unspecified parameters will use the model's default value.
 #inputs:
 #    hrmean: 80
@@ -33,19 +37,15 @@ duration: 504
 charts:
     - filename: cortisol_depression.png
       type: line
-      title: "cortisol_depression (dh_dt)"
+      title: "HPA-axis response to a chronic stressor (onset at 168 h)"
       axisParamX: time
-      axisLabelX: dt (hr)
-      axisLabelY: dh
-      #lowerBoundY: -0.05
-      #upperBoundY: 0.15
+      axisLabelX: time (hr)
+      axisLabelY: level (a.u.)
       series:
-        - param: dh_dt
-        - param: dA_dt
-        - param: dP_dt
-        - param: dx1_internal_dt
-        - param: dx2_dt
-        - param: dx3_dt
+        - param: Cortisol
+        - param: ACTH
+        - param: CRH
+        - param: h
 
 
 # possible parameters

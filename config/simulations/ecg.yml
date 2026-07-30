@@ -16,6 +16,10 @@ stepSize: 0.01
 # Simulation duration in seconds
 duration: 10
 
+# Also emit a FHIR R4 Bundle of sampled Observations to output/.../{name}.fhir.json
+exportFhir: true
+fhirUnit: "mV"
+
 # Model parameter inputs. Any unspecified parameters will use the model's default value.
 inputs:
     hrmean: 80

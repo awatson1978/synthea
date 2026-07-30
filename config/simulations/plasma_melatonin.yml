@@ -10,11 +10,13 @@ model: Brown1997_Plasma_Melatonin.xml
 # Options are: adams_bashforth, adams_moulton, dormand_prince_54, dormand_prince_853, euler, gragg_bulirsh_stoer, higham_hall_54, rosenbrock, runge_kutta
 solver: runge_kutta
 
-# Simulation step size in seconds. Note that this can have significant effects on the results and may impact the ability of the solver to complete successfully.
-stepSize: 0.01
+# Simulation step size (model time unit is minutes).
+stepSize: 1
 
-# Simulation duration in seconds
-duration: 10
+# Simulation duration in minutes. The model secretes melatonin nocturnally between
+# t_on=1316 min (~22:00) and t_off=1794 min (~06:00); run ~2 days to capture the
+# full clearance-then-secretion pulse rather than only the initial decay.
+duration: 2880
 
 ## Model parameter inputs. Any unspecified parameters will use the model's default value.
 #inputs:
@@ -33,10 +35,10 @@ duration: 10
 charts:
     - filename: plasma_melatonin.png
       type: line
-      title: "plasma_melatonin"
+      title: "Plasma melatonin over a 48h light/dark cycle"
       axisParamX: time
-      axisLabelX: time (?)
-      axisLabelY: ???
+      axisLabelX: time (min)
+      axisLabelY: plasma melatonin (a.u.)
       #lowerBoundY: -0.05
       #upperBoundY: 0.15
       series:

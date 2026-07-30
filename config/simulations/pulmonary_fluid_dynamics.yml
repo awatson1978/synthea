@@ -33,10 +33,15 @@ duration: 10
 charts:
     - filename: pulmonary_fluid_dynamics.png
       type: line
-      title: "pulmonary_fluid_dynamics"
+# NOTE: This Guyton pulmonary fluid model starts at its resting equilibrium, so an
+# unperturbed run shows nearly-flat lines settling to steady state. To demonstrate
+# meaningful dynamics (e.g. pulmonary edema formation), drive an input perturbation
+# such as elevated left-atrial pressure (PLA) or capillary pressure (CPP) via the
+# `inputs:` block above. Scenario design of that perturbation is deferred future work.
+      title: "Pulmonary fluid balance (resting equilibrium)"
       axisParamX: time
-      axisLabelX: time (?)
-      axisLabelY: ???
+      axisLabelX: time (min)
+      axisLabelY: pressure (mmHg)
       #lowerBoundY: -0.05
       #upperBoundY: 0.15
       series:
