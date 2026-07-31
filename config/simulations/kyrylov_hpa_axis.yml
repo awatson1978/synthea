@@ -1,0 +1,27 @@
+# Kyrylov2005 HPA-axis model: a 5-state control-systems ODE that produces the
+# robust ultradian (~1-2h) pulsatile cortisol rhythm of the hypothalamic-
+# pituitary-adrenal axis. Complements cortisol_depression.yml, which models the
+# stressor-driven (blunted) response; this one models the healthy rhythm.
+#
+# TODO (follow-up): the model exposes abstract states y0-y4; map them to named
+# biomarkers (cortisol / ACTH / CRH / receptors) from Kyrylov et al. 2005 and add
+# readable alias outputs + units.
+name: kyrylov_hpa_axis
+model: Kyrylov2005_HPAaxis.xml
+solver: dormand_prince_54
+stepSize: 0.1
+duration: 1440
+
+charts:
+    - filename: kyrylov_hpa_axis.png
+      type: line
+      title: "Kyrylov2005 HPA-axis (states y0-y4)"
+      axisParamX: time
+      axisLabelX: time (min)
+      axisLabelY: level (a.u.)
+      series:
+        - param: y0
+        - param: y1
+        - param: y2
+        - param: y3
+        - param: y4

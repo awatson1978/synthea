@@ -56,6 +56,7 @@ means an in-framework module already consumes it.
 | Endocrine / circadian | `mammalian_circadian_rhythm_non_24hr` (Leloup2004) | ~1/day | — | standalone |
 | Endocrine / circadian | `plasma_melatonin` (Brown1997) | ~1/day | light-exposure / sleep | standalone |
 | Endocrine / circadian | `cortisol_depression` (HPA axis) | ~1/day | stress / fatigue monitor | standalone — chronic-stressor scenario |
+| Endocrine / circadian | `kyrylov_hpa_axis` (Kyrylov2005) | ~1–2h ultradian | stress / fatigue monitor | standalone — pulsatile cortisol rhythm |
 | Endocrine | `menstrual_cycle` (Roblitz2013) | ~1/month | cycle tracker | wired → `endometriosis` |
 | Metabolic | `insulin_signalling_normal` (Brännmark2013) | ~1/minute | CGM | standalone |
 | Metabolic | `insulin_signalling_diabetic` (Brännmark2013) | ~1/minute | CGM | standalone |
@@ -74,6 +75,7 @@ means an in-framework module already consumes it.
   ./gradlew physiology --args="config/simulations/ecg.yml"
   ./gradlew physiology --args="config/simulations/insulin_signalling_diabetic.yml"
   ./gradlew physiology --args="config/simulations/insulin_signalling_normal.yml"
+  ./gradlew physiology --args="config/simulations/kyrylov_hpa_axis.yml"
   ./gradlew physiology --args="config/simulations/mammalian_circadian_rhythm_non_24hr.yml"
   ./gradlew physiology --args="config/simulations/menstrual_cycle.yml"
   ./gradlew physiology --args="config/simulations/o2_transport_metabolism.yml"
