@@ -138,7 +138,28 @@
   <parameter metaid="_242434" id="e1" name="e1" value="0" units="microg_l_min"/>
   <parameter metaid="_242436" id="e2" name="e2" value="0" units="microg_l_min"/>
   <parameter metaid="_242437" id="epsilon" name="epsilon" value="0.5" units="microg_l"/>
+  <!-- Readable aliases added for Synthea. The mapping is derived from the model's
+       own interaction topology (the r0-r4 assignment rules) and canonical HPA
+       feedback (CRH -> ACTH -> cortisol; cortisol inhibits CRH and ACTH):
+         y0 = CRH  (self-regulated + inhibited by y2; constitutive drive c0; no upstream input)
+         y1 = ACTH (stimulated by y0, inhibited by y2)
+         y2 = cortisol (the hub: driven by y1, feeds back on y0/y1 and the glands)
+         y3, y4 = the two gland-size states (slow, cortisol-modulated)
+       The three hormone identities are high-confidence; the specific
+       pituitary-vs-adrenal assignment of y3/y4 is not, so those are left as-is. -->
+  <parameter id="CRH" name="CRH" value="1" constant="false"/>
+  <parameter id="ACTH" name="ACTH" value="1" constant="false"/>
+  <parameter id="Cortisol" name="Cortisol" value="1" constant="false"/>
 </listOfParameters><listOfRules>
+  <assignmentRule variable="CRH">
+    <math xmlns="http://www.w3.org/1998/Math/MathML"><ci> y0 </ci></math>
+  </assignmentRule>
+  <assignmentRule variable="ACTH">
+    <math xmlns="http://www.w3.org/1998/Math/MathML"><ci> y1 </ci></math>
+  </assignmentRule>
+  <assignmentRule variable="Cortisol">
+    <math xmlns="http://www.w3.org/1998/Math/MathML"><ci> y2 </ci></math>
+  </assignmentRule>
   <rateRule metaid="_242343" variable="y0">
     <math xmlns="http://www.w3.org/1998/Math/MathML">
       <apply>

@@ -3,9 +3,9 @@
 # pituitary-adrenal axis. Complements cortisol_depression.yml, which models the
 # stressor-driven (blunted) response; this one models the healthy rhythm.
 #
-# TODO (follow-up): the model exposes abstract states y0-y4; map them to named
-# biomarkers (cortisol / ACTH / CRH / receptors) from Kyrylov et al. 2005 and add
-# readable alias outputs + units.
+# The model's abstract states y0-y4 are aliased in the SBML to named biomarkers
+# (y0=CRH, y1=ACTH, y2=cortisol; y3/y4 are gland-size states), so this chart plots
+# the named hormones. See the model file for how the mapping was derived.
 name: kyrylov_hpa_axis
 model: Kyrylov2005_HPAaxis.xml
 solver: dormand_prince_54
@@ -15,13 +15,11 @@ duration: 1440
 charts:
     - filename: kyrylov_hpa_axis.png
       type: line
-      title: "Kyrylov2005 HPA-axis (states y0-y4)"
+      title: "Kyrylov2005 HPA-axis: ultradian CRH / ACTH / cortisol pulses"
       axisParamX: time
       axisLabelX: time (min)
-      axisLabelY: level (a.u.)
+      axisLabelY: hormone level (a.u.)
       series:
-        - param: y0
-        - param: y1
-        - param: y2
-        - param: y3
-        - param: y4
+        - param: Cortisol
+        - param: ACTH
+        - param: CRH
