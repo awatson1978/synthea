@@ -1,0 +1,679 @@
+{
+  "name": "ebola_clinical_course",
+  "remarks": [
+    "Ebola Clinical Course Submodule — ETU Admission, Treatment, and Outcome",
+    "",
+    "Models the inpatient Ebola Treatment Unit (ETU) course from admission through",
+    "either death or recovery. Called for all symptomatic confirmed cases.",
+    "",
+    "Disease progression within the ETU:",
+    "  - GI 'wet' phase begins 4-5 days after symptom onset (modeled as delay from",
+    "    ETU admission, which itself follows ~5 days of care-seeking delay)",
+    "  - Hemorrhagic signs: ~40% of cases; conditional late branch",
+    "  - Supportive care: IV fluids, electrolytes, oxygenation, nutritional support",
+    "",
+    "Species-gated specific therapy (Zaire ebolavirus only):",
+    "  mAb114 (ansuvimab/Ebanga) and REGN-EB3 (Inmazeb) are WHO-recommended for",
+    "  Zaire EVD. PALM trial demonstrated lower 28-day mortality vs. remdesivir/ZMapp.",
+    "  Modeled as 80% access/availability rate in a Zaire outbreak scenario.",
+    "  Specific therapy multiplier on CFR: 0.65 (35% mortality reduction).",
+    "  Sudan and Bundibugyo: no approved therapeutics (2026); supportive care only.",
+    "",
+    "Case fatality rate by species (baseline, before therapy modifier):",
+    "  Zaire untreated:   70% (midpoint of 69-88% historical range)",
+    "  Zaire treated:     45% (70% * 0.65 therapy multiplier)",
+    "  Sudan:             50% (midpoint of 40-60%)",
+    "  Bundibugyo:        35% (midpoint of 30-50%)",
+    "",
+    "Death timeline (from symptom onset, non-survivors):",
+    "  6-8 days: 20%  |  9-12 days: 50%  |  13-16 days: 30%",
+    "  Mean ~9-10 days, consistent with Sierra Leone cohort (9.8 +/- 0.7 days).",
+    "",
+    "Recovery timeline (admission to discharge, survivors):",
+    "  10-14 days: 50%  |  15-21 days: 35%  |  22-28 days: 15%",
+    "  Mean ~12 days, consistent with WHO West Africa estimate (~11.8 days).",
+    "",
+    "Medication codes require verification against current RxNorm release:",
+    "  ansuvimab (mAb114, Ebanga): RxNorm — PLACEHOLDER, verify before production",
+    "  Inmazeb (REGN-EB3 triple Ab): RxNorm — PLACEHOLDER, verify before production",
+    "",
+    "References:",
+    "  - WHO therapeutics guidance (mAb114, REGN-EB3 for Zaire EVD)",
+    "  - PALM randomized trial (NEJM 2019): mortality mAb114 35.1%, REGN-EB3 33.5%",
+    "  - Sierra Leone cohort onset-to-death 9.8 days; WHO West Africa 11.8 day discharge",
+    "  - CDC clinical features; WHO EVD fact sheet 2025"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "ETU_Admission_Encounter"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "ETU_Admission_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "inpatient",
+      "reason": "ebola_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Isolation_Placement_Procedure"
+    },
+    "Isolation_Placement_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "Immediate single-room isolation with airborne + contact precautions.",
+        "N95/FFP2 respirator, gown, gloves, eye protection per CDC/WHO IPC guidance.",
+        "SNOMED 182992009: Treatment of infection (procedure) — general placeholder; verify."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "182992009",
+          "display": "Treatment of infection (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 30,
+        "high": 60,
+        "unit": "minutes"
+      },
+      "reason": "ebola_condition",
+      "direct_transition": "IV_Fluid_Resuscitation"
+    },
+    "IV_Fluid_Resuscitation": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "430701006",
+          "display": "Resuscitation using intravenous fluid (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 240,
+        "unit": "minutes"
+      },
+      "reason": "ebola_condition",
+      "direct_transition": "Vital_Signs_Observation"
+    },
+    "Vital_Signs_Observation": {
+      "type": "MultiObservation",
+      "category": "vital-signs",
+      "number_of_observations": 0,
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "85354-9",
+          "display": "Blood pressure panel with all children optional"
+        }
+      ],
+      "observations": [
+        {
+          "category": "vital-signs",
+          "unit": "mm[Hg]",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "8480-6",
+              "display": "Systolic Blood Pressure"
+            }
+          ],
+          "range": {
+            "low": 80,
+            "high": 110
+          }
+        },
+        {
+          "category": "vital-signs",
+          "unit": "mm[Hg]",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "8462-4",
+              "display": "Diastolic Blood Pressure"
+            }
+          ],
+          "range": {
+            "low": 50,
+            "high": 70
+          }
+        }
+      ],
+      "direct_transition": "Temperature_Observation"
+    },
+    "Temperature_Observation": {
+      "type": "Observation",
+      "category": "vital-signs",
+      "unit": "Cel",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "8310-5",
+          "display": "Body temperature"
+        }
+      ],
+      "range": {
+        "low": 38.5,
+        "high": 40.5
+      },
+      "vital_sign": "Body Temperature",
+      "direct_transition": "GI_Progression_Delay"
+    },
+    "GI_Progression_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "GI 'wet' phase typically 4-5 days after symptom onset per CDC clinical guide.",
+        "This delay models the progression within the ETU after admission."
+      ],
+      "range": {
+        "low": 2,
+        "high": 5,
+        "unit": "days"
+      },
+      "direct_transition": "GI_Progression_Branch"
+    },
+    "GI_Progression_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "CDC: severe watery diarrhea, nausea, vomiting, abdominal pain 4-5 days after onset.",
+        "Probability 70-85%; using 80% as central estimate."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Symptom_Vomiting",
+          "distribution": 0.80
+        },
+        {
+          "transition": "Hemorrhagic_Branch",
+          "distribution": 0.20
+        }
+      ]
+    },
+    "Symptom_Vomiting": {
+      "type": "Symptom",
+      "symptom": "Vomiting",
+      "range": {
+        "low": 100,
+        "high": 400
+      },
+      "direct_transition": "Symptom_Diarrhea"
+    },
+    "Symptom_Diarrhea": {
+      "type": "Symptom",
+      "symptom": "Diarrhea",
+      "range": {
+        "low": 150,
+        "high": 500
+      },
+      "direct_transition": "Symptom_Abdominal_Pain"
+    },
+    "Symptom_Abdominal_Pain": {
+      "type": "Symptom",
+      "symptom": "Abdominal Pain",
+      "range": {
+        "low": 80,
+        "high": 350
+      },
+      "direct_transition": "Hemorrhagic_Branch"
+    },
+    "Hemorrhagic_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "CDC: unexplained bleeding reported in ~40% of cases.",
+        "NOT universal — hemorrhagic signs are a late conditional branch, not a defining feature.",
+        "Recommend 0.10 in nonsevere and 0.60 in severe disease per design brief.",
+        "Using 0.40 overall as the undifferentiated pooled estimate."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Symptom_Bleeding",
+          "distribution": 0.40
+        },
+        {
+          "transition": "Species_Therapy_Gate",
+          "distribution": 0.60
+        }
+      ]
+    },
+    "Symptom_Bleeding": {
+      "type": "Symptom",
+      "symptom": "Bleeding",
+      "range": {
+        "low": 100,
+        "high": 500
+      },
+      "direct_transition": "Species_Therapy_Gate"
+    },
+    "Species_Therapy_Gate": {
+      "type": "Simple",
+      "remarks": [
+        "mAb114 and REGN-EB3 are WHO-recommended ONLY for Zaire ebolavirus.",
+        "Sudan and Bundibugyo: no approved therapeutics (2026). Supportive care only.",
+        "Experimental trial flag for non-Zaire species is out of scope for v1."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_species",
+            "operator": "==",
+            "value": "zaire"
+          },
+          "transition": "Zaire_Therapy_Availability"
+        },
+        {
+          "transition": "No_Specific_Therapy"
+        }
+      ]
+    },
+    "Zaire_Therapy_Availability": {
+      "type": "Simple",
+      "remarks": [
+        "80% of Zaire patients receive specific mAb therapy (scenario prior).",
+        "20% do not receive it (supply shortage, late presentation, contraindication).",
+        "Tune this distribution for resource-limited vs. well-resourced scenarios."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Select_mAb_Agent",
+          "distribution": 0.80
+        },
+        {
+          "transition": "No_Specific_Therapy",
+          "distribution": 0.20
+        }
+      ]
+    },
+    "Select_mAb_Agent": {
+      "type": "Simple",
+      "remarks": [
+        "PALM trial: mAb114 mortality 35.1%, REGN-EB3 mortality 33.5% — both superior.",
+        "50/50 split models both approved agents without preferring one.",
+        "Supply and protocol constraints would shift this in a real outbreak."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "mAb114_Order",
+          "distribution": 0.50
+        },
+        {
+          "transition": "REGN_EB3_Order",
+          "distribution": 0.50
+        }
+      ]
+    },
+    "mAb114_Order": {
+      "type": "MedicationOrder",
+      "remarks": [
+        "Ansuvimab (mAb114, brand: Ebanga). FDA approved October 2020 for Zaire EVD.",
+        "WHO strongly recommends for Zaire EVD; single IV infusion.",
+        "RxNorm code: PLACEHOLDER — verify against current RxNorm release."
+      ],
+      "codes": [
+        {
+          "system": "RxNorm",
+          "code": "2395685",
+          "display": "ansuvimab"
+        }
+      ],
+      "reason": "ebola_condition",
+      "direct_transition": "Set_Therapy_mAb114"
+    },
+    "Set_Therapy_mAb114": {
+      "type": "SetAttribute",
+      "attribute": "ebola_specific_therapy",
+      "value": "mAb114",
+      "direct_transition": "Set_Treated"
+    },
+    "REGN_EB3_Order": {
+      "type": "MedicationOrder",
+      "remarks": [
+        "Atoltivimab + maftivimab + odesivimab-ebgn (Inmazeb, REGN-EB3).",
+        "FDA approved October 2020 for Zaire EVD. WHO strongly recommends.",
+        "Triple-antibody cocktail; single IV infusion.",
+        "RxNorm code: PLACEHOLDER — verify against current RxNorm release."
+      ],
+      "codes": [
+        {
+          "system": "RxNorm",
+          "code": "2395691",
+          "display": "atoltivimab, maftivimab, and odesivimab-ebgn"
+        }
+      ],
+      "reason": "ebola_condition",
+      "direct_transition": "Set_Therapy_REGN_EB3"
+    },
+    "Set_Therapy_REGN_EB3": {
+      "type": "SetAttribute",
+      "attribute": "ebola_specific_therapy",
+      "value": "REGN-EB3",
+      "direct_transition": "Set_Treated"
+    },
+    "Set_Treated": {
+      "type": "SetAttribute",
+      "attribute": "ebola_treated",
+      "value": true,
+      "direct_transition": "Outcome_Branch"
+    },
+    "No_Specific_Therapy": {
+      "type": "SetAttribute",
+      "attribute": "ebola_treated",
+      "value": false,
+      "direct_transition": "Outcome_Branch"
+    },
+    "Outcome_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Route to species-specific outcome distributions.",
+        "CFR formula: baseline_species_cfr * therapy_multiplier (if treated)."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_species",
+            "operator": "==",
+            "value": "zaire"
+          },
+          "transition": "Zaire_Outcome_Branch"
+        },
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_species",
+            "operator": "==",
+            "value": "sudan"
+          },
+          "transition": "Sudan_Outcome_Branch"
+        },
+        {
+          "transition": "Bundibugyo_Outcome_Branch"
+        }
+      ]
+    },
+    "Zaire_Outcome_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Zaire treated (mAb114/REGN-EB3): ~45% CFR (70% base * 0.65 therapy multiplier).",
+        "Zaire untreated: ~70% CFR (midpoint of 69-88% historical range)."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_treated",
+            "operator": "==",
+            "value": true
+          },
+          "transition": "Zaire_Treated_Outcome"
+        },
+        {
+          "transition": "Zaire_Untreated_Outcome"
+        }
+      ]
+    },
+    "Zaire_Treated_Outcome": {
+      "type": "Simple",
+      "distributed_transition": [
+        {
+          "transition": "Death_Delay_Select",
+          "distribution": 0.45
+        },
+        {
+          "transition": "Recovery_Delay_Select",
+          "distribution": 0.55
+        }
+      ]
+    },
+    "Zaire_Untreated_Outcome": {
+      "type": "Simple",
+      "distributed_transition": [
+        {
+          "transition": "Death_Delay_Select",
+          "distribution": 0.70
+        },
+        {
+          "transition": "Recovery_Delay_Select",
+          "distribution": 0.30
+        }
+      ]
+    },
+    "Sudan_Outcome_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Sudan ebolavirus CFR midpoint ~50% (historical range 40-60%).",
+        "No approved therapeutics — supportive care only."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Death_Delay_Select",
+          "distribution": 0.50
+        },
+        {
+          "transition": "Recovery_Delay_Select",
+          "distribution": 0.50
+        }
+      ]
+    },
+    "Bundibugyo_Outcome_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Bundibugyo ebolavirus CFR midpoint ~35% (historical range 30-50%).",
+        "WHO 2026 Bundibugyo outbreak notice: past outbreaks CFR 30-50%.",
+        "No approved therapeutics or vaccines."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Death_Delay_Select",
+          "distribution": 0.35
+        },
+        {
+          "transition": "Recovery_Delay_Select",
+          "distribution": 0.65
+        }
+      ]
+    },
+    "Death_Delay_Select": {
+      "type": "Simple",
+      "remarks": [
+        "CDC + Sierra Leone cohort: death 6-16 days after symptom onset.",
+        "Mean ~9-10 days from onset. Binned to match this distribution."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Death_6_to_8",
+          "distribution": 0.20
+        },
+        {
+          "transition": "Death_9_to_12",
+          "distribution": 0.50
+        },
+        {
+          "transition": "Death_13_to_16",
+          "distribution": 0.30
+        }
+      ]
+    },
+    "Death_6_to_8": {
+      "type": "Delay",
+      "range": {
+        "low": 1,
+        "high": 3,
+        "unit": "days"
+      },
+      "direct_transition": "Death_from_Ebola"
+    },
+    "Death_9_to_12": {
+      "type": "Delay",
+      "range": {
+        "low": 3,
+        "high": 7,
+        "unit": "days"
+      },
+      "direct_transition": "Death_from_Ebola"
+    },
+    "Death_13_to_16": {
+      "type": "Delay",
+      "range": {
+        "low": 7,
+        "high": 11,
+        "unit": "days"
+      },
+      "direct_transition": "Death_from_Ebola"
+    },
+    "Death_from_Ebola": {
+      "type": "Death",
+      "condition_onset": "Ebola_Condition_Onset",
+      "direct_transition": "ETU_End_Encounter_Death"
+    },
+    "ETU_End_Encounter_Death": {
+      "type": "EncounterEnd",
+      "direct_transition": "Terminal"
+    },
+    "Recovery_Delay_Select": {
+      "type": "Simple",
+      "remarks": [
+        "WHO West Africa: mean admission-to-discharge ~11.8 days.",
+        "Binned to approximate this distribution."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Recovery_10_to_14",
+          "distribution": 0.50
+        },
+        {
+          "transition": "Recovery_15_to_21",
+          "distribution": 0.35
+        },
+        {
+          "transition": "Recovery_22_to_28",
+          "distribution": 0.15
+        }
+      ]
+    },
+    "Recovery_10_to_14": {
+      "type": "Delay",
+      "range": {
+        "low": 10,
+        "high": 14,
+        "unit": "days"
+      },
+      "direct_transition": "End_Ebola_Condition"
+    },
+    "Recovery_15_to_21": {
+      "type": "Delay",
+      "range": {
+        "low": 15,
+        "high": 21,
+        "unit": "days"
+      },
+      "direct_transition": "End_Ebola_Condition"
+    },
+    "Recovery_22_to_28": {
+      "type": "Delay",
+      "range": {
+        "low": 22,
+        "high": 28,
+        "unit": "days"
+      },
+      "direct_transition": "End_Ebola_Condition"
+    },
+    "End_Ebola_Condition": {
+      "type": "ConditionEnd",
+      "referenced_by_attribute": "ebola_condition",
+      "direct_transition": "Clear_Symptom_Fever"
+    },
+    "Clear_Symptom_Fever": {
+      "type": "Symptom",
+      "symptom": "Fever",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "Clear_Symptom_Fatigue"
+    },
+    "Clear_Symptom_Fatigue": {
+      "type": "Symptom",
+      "symptom": "Fatigue",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "Clear_Symptom_Myalgia"
+    },
+    "Clear_Symptom_Myalgia": {
+      "type": "Symptom",
+      "symptom": "Myalgia",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "Clear_Symptom_Headache"
+    },
+    "Clear_Symptom_Headache": {
+      "type": "Symptom",
+      "symptom": "Headache",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "Clear_Symptom_Vomiting"
+    },
+    "Clear_Symptom_Vomiting": {
+      "type": "Symptom",
+      "symptom": "Vomiting",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "Clear_Symptom_Diarrhea"
+    },
+    "Clear_Symptom_Diarrhea": {
+      "type": "Symptom",
+      "symptom": "Diarrhea",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "Clear_Symptom_Abdominal_Pain"
+    },
+    "Clear_Symptom_Abdominal_Pain": {
+      "type": "Symptom",
+      "symptom": "Abdominal Pain",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "Clear_Symptom_Bleeding"
+    },
+    "Clear_Symptom_Bleeding": {
+      "type": "Symptom",
+      "symptom": "Bleeding",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "ETU_Discharge"
+    },
+    "ETU_Discharge": {
+      "type": "EncounterEnd",
+      "discharge_disposition": {
+        "system": "NUBC",
+        "code": 1,
+        "display": "Discharge to home"
+      },
+      "direct_transition": "Set_Survivor_Followup"
+    },
+    "Set_Survivor_Followup": {
+      "type": "SetAttribute",
+      "attribute": "ebola_survivor_followup",
+      "value": true,
+      "direct_transition": "Call_Public_Health"
+    },
+    "Call_Public_Health": {
+      "type": "CallSubmodule",
+      "submodule": "ebola/ebola_public_health",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}

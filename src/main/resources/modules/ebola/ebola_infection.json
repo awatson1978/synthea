@@ -1,0 +1,344 @@
+{
+  "name": "ebola_infection",
+  "remarks": [
+    "Ebola Infection Submodule — Incubation, Symptoms, and Care-Seeking",
+    "",
+    "Models the natural history from exposure to first health-facility contact:",
+    "  1. Incubation (binned mixture approximating WHO/CDC range of 2-21 days)",
+    "  2. Asymptomatic branch (10% default; pooled estimate 27% with wide CI)",
+    "  3. Early 'dry' prodrome: fever, fatigue, myalgia, headache",
+    "  4. Care-seeking delay bins (mean ~5 days from onset per West Africa analysis)",
+    "  5. Suspected-case encounter and formal ConditionOnset",
+    "  6. Calls diagnostics and clinical-course submodules",
+    "",
+    "Incubation bins (discrete mixture approximating right-skewed distribution):",
+    "  2-4 days: 10%  |  5-7 days: 25%  |  8-10 days: 30%",
+    "  11-14 days: 20%  |  15-21 days: 15%",
+    "  Mean ~9-10 days — consistent with CDC 8-10 day average and WHO 11.4-day mean.",
+    "",
+    "Care-seeking delay from symptom onset (West Africa mean ~5 days):",
+    "  0-2 days: 20%  |  3-5 days: 45%  |  6-8 days: 25%  |  9-14 days: 10%",
+    "",
+    "Key design rule:",
+    "  Suspected_Case_Encounter (Encounter) PRECEDES Ebola_Condition_Onset (ConditionOnset)",
+    "  so the encounter is open and in the list when conditionStart() fires — prevents",
+    "  stale-lock mis-diagnosis into a prior encounter (learned from ANDV module).",
+    "",
+    "Attributes set:",
+    "  ebola_case_status   : 'asymptomatic' | 'suspected' (confirmed set by diagnostics)",
+    "  ebola_infectious    : true (at symptom onset)",
+    "  ebola_symptom_day   : integer — days from symptom onset at care-seeking",
+    "  ebola_condition     : condition attribute set by ConditionOnset",
+    "",
+    "References:",
+    "  - WHO/CDC EVD fact sheets; WHO Response Team 2014 NEJM West Africa analysis",
+    "  - Sierra Leone cohort (onset-to-hospitalization 5.0 ± 4.7 days)",
+    "  - Design brief: Designing a Synthea Module for Ebola (2026)"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Select_Incubation_Bin"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Select_Incubation_Bin": {
+      "type": "Simple",
+      "remarks": [
+        "Five-bin discrete mixture approximating the right-skewed 2-21 day distribution.",
+        "WHO 2025 range: 2-21 days; CDC average 8-10 days; West Africa mean 11.4 days.",
+        "This mixture yields a mean of ~9-10 days, consistent with pooled estimates."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Incubation_2_to_4",
+          "distribution": 0.10
+        },
+        {
+          "transition": "Incubation_5_to_7",
+          "distribution": 0.25
+        },
+        {
+          "transition": "Incubation_8_to_10",
+          "distribution": 0.30
+        },
+        {
+          "transition": "Incubation_11_to_14",
+          "distribution": 0.20
+        },
+        {
+          "transition": "Incubation_15_to_21",
+          "distribution": 0.15
+        }
+      ]
+    },
+    "Incubation_2_to_4": {
+      "type": "Delay",
+      "range": {
+        "low": 2,
+        "high": 4,
+        "unit": "days"
+      },
+      "direct_transition": "Symptom_Onset_Branch"
+    },
+    "Incubation_5_to_7": {
+      "type": "Delay",
+      "range": {
+        "low": 5,
+        "high": 7,
+        "unit": "days"
+      },
+      "direct_transition": "Symptom_Onset_Branch"
+    },
+    "Incubation_8_to_10": {
+      "type": "Delay",
+      "range": {
+        "low": 8,
+        "high": 10,
+        "unit": "days"
+      },
+      "direct_transition": "Symptom_Onset_Branch"
+    },
+    "Incubation_11_to_14": {
+      "type": "Delay",
+      "range": {
+        "low": 11,
+        "high": 14,
+        "unit": "days"
+      },
+      "direct_transition": "Symptom_Onset_Branch"
+    },
+    "Incubation_15_to_21": {
+      "type": "Delay",
+      "range": {
+        "low": 15,
+        "high": 21,
+        "unit": "days"
+      },
+      "direct_transition": "Symptom_Onset_Branch"
+    },
+    "Symptom_Onset_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Asymptomatic fraction: 10% default (pooled estimate 27% with wide CI).",
+        "Asymptomatic EVD is not clinically detected in standard outbreak response.",
+        "Symptomatic cases proceed to dry prodrome then care-seeking."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Set_Asymptomatic",
+          "distribution": 0.10
+        },
+        {
+          "transition": "Set_Infectious",
+          "distribution": 0.90
+        }
+      ]
+    },
+    "Set_Asymptomatic": {
+      "type": "SetAttribute",
+      "attribute": "ebola_case_status",
+      "value": "asymptomatic",
+      "direct_transition": "Terminal"
+    },
+    "Set_Infectious": {
+      "type": "SetAttribute",
+      "attribute": "ebola_infectious",
+      "value": true,
+      "direct_transition": "Symptom_Fever"
+    },
+    "Symptom_Fever": {
+      "type": "Symptom",
+      "symptom": "Fever",
+      "range": {
+        "low": 100,
+        "high": 500
+      },
+      "direct_transition": "Symptom_Fatigue"
+    },
+    "Symptom_Fatigue": {
+      "type": "Symptom",
+      "symptom": "Fatigue",
+      "range": {
+        "low": 80,
+        "high": 400
+      },
+      "direct_transition": "Symptom_Myalgia"
+    },
+    "Symptom_Myalgia": {
+      "type": "Symptom",
+      "symptom": "Myalgia",
+      "range": {
+        "low": 80,
+        "high": 350
+      },
+      "direct_transition": "Symptom_Headache"
+    },
+    "Symptom_Headache": {
+      "type": "Symptom",
+      "symptom": "Headache",
+      "range": {
+        "low": 60,
+        "high": 300
+      },
+      "direct_transition": "Care_Seeking_Delay_Select"
+    },
+    "Care_Seeking_Delay_Select": {
+      "type": "Simple",
+      "remarks": [
+        "West Africa: mean onset-to-hospitalization 5.0 +/- 4.7 days.",
+        "Binned to match this distribution. Later-seeking patients (day 6+) had",
+        "more community transmission before isolation — modeled via ebola_symptom_day."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Care_Seek_0_2",
+          "distribution": 0.20
+        },
+        {
+          "transition": "Care_Seek_3_5",
+          "distribution": 0.45
+        },
+        {
+          "transition": "Care_Seek_6_8",
+          "distribution": 0.25
+        },
+        {
+          "transition": "Care_Seek_9_14",
+          "distribution": 0.10
+        }
+      ]
+    },
+    "Care_Seek_0_2": {
+      "type": "Delay",
+      "range": {
+        "low": 0,
+        "high": 2,
+        "unit": "days"
+      },
+      "direct_transition": "Set_Symptom_Day_0_2"
+    },
+    "Care_Seek_3_5": {
+      "type": "Delay",
+      "range": {
+        "low": 3,
+        "high": 5,
+        "unit": "days"
+      },
+      "direct_transition": "Set_Symptom_Day_3_5"
+    },
+    "Care_Seek_6_8": {
+      "type": "Delay",
+      "range": {
+        "low": 6,
+        "high": 8,
+        "unit": "days"
+      },
+      "direct_transition": "Set_Symptom_Day_6_8"
+    },
+    "Care_Seek_9_14": {
+      "type": "Delay",
+      "range": {
+        "low": 9,
+        "high": 14,
+        "unit": "days"
+      },
+      "direct_transition": "Set_Symptom_Day_9_14"
+    },
+    "Set_Symptom_Day_0_2": {
+      "type": "SetAttribute",
+      "attribute": "ebola_symptom_day",
+      "range": {
+        "low": 0,
+        "high": 2
+      },
+      "direct_transition": "Suspected_Case_Encounter"
+    },
+    "Set_Symptom_Day_3_5": {
+      "type": "SetAttribute",
+      "attribute": "ebola_symptom_day",
+      "range": {
+        "low": 3,
+        "high": 5
+      },
+      "direct_transition": "Suspected_Case_Encounter"
+    },
+    "Set_Symptom_Day_6_8": {
+      "type": "SetAttribute",
+      "attribute": "ebola_symptom_day",
+      "range": {
+        "low": 6,
+        "high": 8
+      },
+      "direct_transition": "Suspected_Case_Encounter"
+    },
+    "Set_Symptom_Day_9_14": {
+      "type": "SetAttribute",
+      "attribute": "ebola_symptom_day",
+      "range": {
+        "low": 9,
+        "high": 14
+      },
+      "direct_transition": "Suspected_Case_Encounter"
+    },
+    "Suspected_Case_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "emergency",
+      "reason": "Ebola_Condition_Onset",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "remarks": [
+        "Encounter PRECEDES ConditionOnset — critical ordering to avoid stale-lock",
+        "mis-diagnosis into a prior encounter (ANDV lesson learned).",
+        "reason uses state name 'Ebola_Condition_Onset' so Encounter.process() resolves",
+        "the reason code via getStateNames() fallback before the attribute is set."
+      ],
+      "direct_transition": "Ebola_Condition_Onset"
+    },
+    "Ebola_Condition_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED 37109004: Ebola virus disease (disorder). Verify against current release.",
+        "Runs after Suspected_Case_Encounter so the encounter is open when conditionStart()",
+        "fires — ensures correct encounter attachment via diagnosePastConditions()."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "37109004",
+          "display": "Ebola virus disease (disorder)"
+        }
+      ],
+      "assign_to_attribute": "ebola_condition",
+      "target_encounter": "Suspected_Case_Encounter",
+      "direct_transition": "Set_Case_Status_Suspected"
+    },
+    "Set_Case_Status_Suspected": {
+      "type": "SetAttribute",
+      "attribute": "ebola_case_status",
+      "value": "suspected",
+      "direct_transition": "End_Suspected_Case_Encounter"
+    },
+    "End_Suspected_Case_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Call_Diagnostics"
+    },
+    "Call_Diagnostics": {
+      "type": "CallSubmodule",
+      "submodule": "ebola/ebola_diagnostics",
+      "direct_transition": "Call_Clinical_Course"
+    },
+    "Call_Clinical_Course": {
+      "type": "CallSubmodule",
+      "submodule": "ebola/ebola_clinical_course",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}

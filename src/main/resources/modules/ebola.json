@@ -1,0 +1,174 @@
+{
+  "name": "ebola",
+  "remarks": [
+    "Ebola Virus Disease (EVD) — Entry-Point Controller Module",
+    "",
+    "Two-layer architecture: this controller assigns species and exposure probability,",
+    "then delegates to submodules under ebola/ for the full clinical pathway.",
+    "",
+    "Viral species is the most important top-level parameter because CFR, available",
+    "therapeutics, and vaccine options differ sharply by species:",
+    "  Zaire ebolavirus (EBOV):     CFR ~69-88%; mAb114 + REGN-EB3 approved; ERVEBO licensed",
+    "  Sudan ebolavirus (SUDV):     CFR ~40-60%; no approved therapeutics or vaccines (2026)",
+    "  Bundibugyo ebolavirus (BDBV): CFR ~30-50%; no approved therapeutics or vaccines (2026)",
+    "",
+    "Species distribution default (85/10/5) models a Zaire-dominant outbreak scenario.",
+    "Adjust for Sudan- or Bundibugyo-specific outbreak drills.",
+    "",
+    "If ebola_species is pre-set by an external scenario engine, the module respects",
+    "it and skips the distributed assignment. Similarly, ebola_exposed=true bypasses",
+    "the population-level prevalence gate.",
+    "",
+    "Prevalence gate (0.5%) is a general-population prior. Set higher for outbreak",
+    "scenarios or use ebola_exposed=true to seed specific patients.",
+    "",
+    "References:",
+    "  - WHO Ebola fact sheet 2025; WHO 2026 Bundibugyo disease outbreak notice",
+    "  - CDC Ebola disease basics, clinical features, lab guidance",
+    "  - WHO therapeutics guidance (mAb114, REGN-EB3 for Zaire EVD)",
+    "  - Design brief: Designing a Synthea Module for Ebola (2026)"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Age_Guard"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Age_Guard": {
+      "type": "Guard",
+      "remarks": [
+        "EVD affects all ages. Guard on age >= 1 to exclude neonatal period.",
+        "After passing, check for externally seeded exposure before prevalence gate."
+      ],
+      "allow": {
+        "condition_type": "Age",
+        "operator": ">=",
+        "quantity": 1,
+        "unit": "years"
+      },
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_exposed",
+            "operator": "==",
+            "value": true
+          },
+          "transition": "Check_Species_Preassigned"
+        },
+        {
+          "transition": "Prevalence_Check"
+        }
+      ]
+    },
+    "Prevalence_Check": {
+      "type": "Simple",
+      "remarks": [
+        "0.5% prevalence gate for general-population runs.",
+        "Increase for outbreak scenarios; decrease for background endemic baseline."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Check_Species_Preassigned",
+          "distribution": 0.005
+        },
+        {
+          "transition": "Terminal",
+          "distribution": 0.995
+        }
+      ]
+    },
+    "Check_Species_Preassigned": {
+      "type": "Simple",
+      "remarks": [
+        "If ebola_species was set by an external scenario engine, skip assignment.",
+        "If not pre-set, fall through to distributed species assignment."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_species",
+            "operator": "==",
+            "value": "zaire"
+          },
+          "transition": "Init_Defaults"
+        },
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_species",
+            "operator": "==",
+            "value": "sudan"
+          },
+          "transition": "Init_Defaults"
+        },
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "ebola_species",
+            "operator": "==",
+            "value": "bundibugyo"
+          },
+          "transition": "Init_Defaults"
+        },
+        {
+          "transition": "Assign_Species"
+        }
+      ]
+    },
+    "Assign_Species": {
+      "type": "Simple",
+      "remarks": [
+        "Default species mix for a generic Zaire-dominant outbreak scenario.",
+        "Tune for country-specific or single-species outbreak drills."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Set_Species_Zaire",
+          "distribution": 0.85
+        },
+        {
+          "transition": "Set_Species_Sudan",
+          "distribution": 0.10
+        },
+        {
+          "transition": "Set_Species_Bundibugyo",
+          "distribution": 0.05
+        }
+      ]
+    },
+    "Set_Species_Zaire": {
+      "type": "SetAttribute",
+      "attribute": "ebola_species",
+      "value": "zaire",
+      "direct_transition": "Init_Defaults"
+    },
+    "Set_Species_Sudan": {
+      "type": "SetAttribute",
+      "attribute": "ebola_species",
+      "value": "sudan",
+      "direct_transition": "Init_Defaults"
+    },
+    "Set_Species_Bundibugyo": {
+      "type": "SetAttribute",
+      "attribute": "ebola_species",
+      "value": "bundibugyo",
+      "direct_transition": "Init_Defaults"
+    },
+    "Init_Defaults": {
+      "type": "SetAttribute",
+      "attribute": "ebola_specific_therapy",
+      "value": "none",
+      "direct_transition": "Call_Exposure_Submodule"
+    },
+    "Call_Exposure_Submodule": {
+      "type": "CallSubmodule",
+      "submodule": "ebola/ebola_exposure",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}
