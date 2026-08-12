@@ -1,0 +1,464 @@
+{
+  "name": "andv_hcps_course",
+  "remarks": [
+    "ANDV Hantavirus Cardiopulmonary Syndrome (HCPS) Clinical Course Submodule",
+    "",
+    "Models the high-consequence trajectory from cardiopulmonary decompensation",
+    "through ICU care, ECMO if needed, and final outcome (death or recovery).",
+    "",
+    "Pathophysiology (encoded as state transitions):",
+    "  - Central event: endothelial barrier dysfunction → vascular permeability →",
+    "    capillary leak → noncardiogenic pulmonary edema + hypovolemic/distributive shock.",
+    "  - Neither classical septic shock nor purely cardiogenic shock — unique physiology.",
+    "  - Deterioration in 2/3 of patients within 8-24 hours of cardiopulmonary onset.",
+    "",
+    "Key parameters (scenario priors, all tunable):",
+    "  ICU rate among hospitalized: 70% (midpoint of clinical literature range)",
+    "  ECMO rate among ICU:         25% (2023 Chile data: 25% of diagnosed cases)",
+    "  CFR overall:                  30% (midpoint of 20-40% endemic-country range)",
+    "  CFR ECMO cases (severe):      33% (higher; ECMO selected for refractory cases)",
+    "  ICU stay: 7-21 days; ward stay: 3-10 days",
+    "",
+    "SNOMED codes marked 'verify' require confirmation against current SNOMED release.",
+    "Confirmed codes (used in existing Synthea modules):",
+    "  40617009  Artificial ventilation (regime/therapy)   [sepsis.json]",
+    "  305351004 Admission to intensive care unit (procedure) [covid19/admission.json]",
+    "  67782005  Acute respiratory distress syndrome (disorder) [sepsis.json]",
+    "",
+    "References:",
+    "  - 2024 Chile narrative review (ScienceDirect S088394412400354X)",
+    "  - WHO hantavirus fact sheet 2026 (CFR up to 40-50%)",
+    "  - Design brief: Designing a Synthea Module for Andes Virus Outbreaks (2026)"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "HCPS_Condition_Onset"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "HCPS_Condition_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED 95891000: Hantavirus cardiopulmonary syndrome (disorder). Verify."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "95891000",
+          "display": "Hantavirus cardiopulmonary syndrome (disorder)"
+        }
+      ],
+      "assign_to_attribute": "andv_hcps_condition",
+      "target_encounter": "HCPS_ED_Encounter",
+      "direct_transition": "Dyspnea_Symptom"
+    },
+    "Dyspnea_Symptom": {
+      "type": "Symptom",
+      "symptom": "Dyspnea",
+      "range": {
+        "low": 150,
+        "high": 500
+      },
+      "direct_transition": "Hypotension_Symptom"
+    },
+    "Hypotension_Symptom": {
+      "type": "Symptom",
+      "symptom": "Hypotension",
+      "range": {
+        "low": 100,
+        "high": 400
+      },
+      "direct_transition": "HCPS_ED_Encounter"
+    },
+    "HCPS_ED_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "emergency",
+      "reason": "andv_hcps_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "SpO2_Observation"
+    },
+    "SpO2_Observation": {
+      "type": "Observation",
+      "category": "vital-signs",
+      "unit": "%",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "2708-6",
+          "display": "Oxygen saturation in Arterial blood"
+        },
+        {
+          "system": "LOINC",
+          "code": "59408-5",
+          "display": "Oxygen saturation in Arterial blood by Pulse oximetry"
+        }
+      ],
+      "remarks": [
+        "Hypoxemia characteristic of HCPS — noncardiogenic pulmonary edema.",
+        "Range 70-89% models acute decompensation phase."
+      ],
+      "range": {
+        "low": 70,
+        "high": 89
+      },
+      "vital_sign": "Oxygen Saturation",
+      "direct_transition": "Systolic_BP_Observation"
+    },
+    "Systolic_BP_Observation": {
+      "type": "MultiObservation",
+      "category": "vital-signs",
+      "number_of_observations": 0,
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "85354-9",
+          "display": "Blood pressure panel with all children optional"
+        }
+      ],
+      "observations": [
+        {
+          "category": "vital-signs",
+          "unit": "mm[Hg]",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "8480-6",
+              "display": "Systolic Blood Pressure"
+            }
+          ],
+          "range": {
+            "low": 60,
+            "high": 89
+          }
+        },
+        {
+          "category": "vital-signs",
+          "unit": "mm[Hg]",
+          "codes": [
+            {
+              "system": "LOINC",
+              "code": "8462-4",
+              "display": "Diastolic Blood Pressure"
+            }
+          ],
+          "range": {
+            "low": 40,
+            "high": 60
+          }
+        }
+      ],
+      "direct_transition": "ARDS_Condition_Onset"
+    },
+    "ARDS_Condition_Onset": {
+      "type": "ConditionOnset",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "67782005",
+          "display": "Acute respiratory distress syndrome (disorder)"
+        }
+      ],
+      "assign_to_attribute": "andv_ards_condition",
+      "direct_transition": "Deterioration_Branch"
+    },
+    "Deterioration_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "70% progress to ICU (severe HCPS), 30% managed on general ward.",
+        "In practice, most diagnosed HCPS cases require ICU-level care."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Set_ICU_Stay_Duration",
+          "distribution": 0.70
+        },
+        {
+          "transition": "Set_Ward_Stay_Duration",
+          "distribution": 0.30
+        }
+      ]
+    },
+    "Set_Ward_Stay_Duration": {
+      "type": "SetAttribute",
+      "attribute": "andv_ward_days",
+      "range": {
+        "low": 3,
+        "high": 10
+      },
+      "direct_transition": "Ward_Admission_Encounter"
+    },
+    "Ward_Admission_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "inpatient",
+      "reason": "andv_hcps_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "449214001",
+          "display": "Transfer to stepdown unit (procedure)"
+        }
+      ],
+      "direct_transition": "Fluid_Resuscitation_Ward"
+    },
+    "Fluid_Resuscitation_Ward": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "430701006",
+          "display": "Resuscitation using intravenous fluid (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 30,
+        "high": 60,
+        "unit": "minutes"
+      },
+      "reason": "andv_hcps_condition",
+      "direct_transition": "Ward_Delay"
+    },
+    "Ward_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 3,
+        "high": 10,
+        "unit": "days"
+      },
+      "distributed_transition": [
+        {
+          "transition": "Ward_Recovery",
+          "distribution": 0.80
+        },
+        {
+          "transition": "Ward_Death",
+          "distribution": 0.20
+        }
+      ]
+    },
+    "Ward_Recovery": {
+      "type": "ConditionEnd",
+      "referenced_by_attribute": "andv_hcps_condition",
+      "direct_transition": "End_ARDS_Ward"
+    },
+    "End_ARDS_Ward": {
+      "type": "ConditionEnd",
+      "referenced_by_attribute": "andv_ards_condition",
+      "direct_transition": "Ward_Discharge"
+    },
+    "Ward_Discharge": {
+      "type": "EncounterEnd",
+      "discharge_disposition": {
+        "system": "NUBC",
+        "code": 1,
+        "display": "Discharge to home"
+      },
+      "direct_transition": "Call_Public_Health"
+    },
+    "Ward_Death": {
+      "type": "Death",
+      "direct_transition": "Ward_End_Encounter_Death"
+    },
+    "Ward_End_Encounter_Death": {
+      "type": "EncounterEnd",
+      "direct_transition": "Terminal"
+    },
+    "Set_ICU_Stay_Duration": {
+      "type": "SetAttribute",
+      "attribute": "andv_icu_days",
+      "range": {
+        "low": 7,
+        "high": 21
+      },
+      "direct_transition": "ICU_Admission_Encounter"
+    },
+    "ICU_Admission_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "inpatient",
+      "reason": "andv_hcps_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "305351004",
+          "display": "Admission to intensive care unit (procedure)"
+        }
+      ],
+      "direct_transition": "Fluid_Resuscitation_ICU"
+    },
+    "Fluid_Resuscitation_ICU": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "430701006",
+          "display": "Resuscitation using intravenous fluid (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 30,
+        "high": 60,
+        "unit": "minutes"
+      },
+      "reason": "andv_hcps_condition",
+      "direct_transition": "Mechanical_Ventilation"
+    },
+    "Mechanical_Ventilation": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "40617009",
+          "display": "Artificial ventilation (regime/therapy)"
+        }
+      ],
+      "duration": {
+        "low": 1,
+        "high": 14,
+        "unit": "days"
+      },
+      "reason": "andv_ards_condition",
+      "direct_transition": "ECMO_Branch"
+    },
+    "ECMO_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "25% of ICU patients require VA-ECMO (per 2023 Chile surveillance data).",
+        "Early transfer to ECMO-capable center is a critical care decision point."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "VA_ECMO_Procedure",
+          "distribution": 0.25
+        },
+        {
+          "transition": "ICU_Delay_No_ECMO",
+          "distribution": 0.75
+        }
+      ]
+    },
+    "VA_ECMO_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "SNOMED 233573008: Extracorporeal membrane oxygenation (procedure). Verify."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "233573008",
+          "display": "Extracorporeal membrane oxygenation (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 3,
+        "high": 14,
+        "unit": "days"
+      },
+      "reason": "andv_hcps_condition",
+      "direct_transition": "ECMO_ICU_Delay"
+    },
+    "ECMO_ICU_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 5,
+        "high": 14,
+        "unit": "days"
+      },
+      "remarks": [
+        "ECMO patients who are severe — higher CFR in this branch.",
+        "Two-thirds survival in older ECMO series; using 67% survival here."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "ICU_Death",
+          "distribution": 0.33
+        },
+        {
+          "transition": "ICU_Recovery",
+          "distribution": 0.67
+        }
+      ]
+    },
+    "ICU_Delay_No_ECMO": {
+      "type": "Delay",
+      "range": {
+        "low": 7,
+        "high": 21,
+        "unit": "days"
+      },
+      "remarks": [
+        "Non-ECMO ICU patients: ~70% survival in this branch.",
+        "Overall CFR ~30% achieved by mixing ECMO (33% CFR) and non-ECMO (30% CFR) arms."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "ICU_Death",
+          "distribution": 0.30
+        },
+        {
+          "transition": "ICU_Recovery",
+          "distribution": 0.70
+        }
+      ]
+    },
+    "ICU_Death": {
+      "type": "Death",
+      "exact": {
+        "quantity": 1,
+        "unit": "days"
+      },
+      "direct_transition": "ICU_End_Encounter_Death"
+    },
+    "ICU_End_Encounter_Death": {
+      "type": "EncounterEnd",
+      "direct_transition": "Terminal"
+    },
+    "ICU_Recovery": {
+      "type": "ConditionEnd",
+      "referenced_by_attribute": "andv_hcps_condition",
+      "direct_transition": "End_ARDS_ICU"
+    },
+    "End_ARDS_ICU": {
+      "type": "ConditionEnd",
+      "referenced_by_attribute": "andv_ards_condition",
+      "direct_transition": "End_Dyspnea_Symptom"
+    },
+    "End_Dyspnea_Symptom": {
+      "type": "Symptom",
+      "symptom": "Dyspnea",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "End_Hypotension_Symptom"
+    },
+    "End_Hypotension_Symptom": {
+      "type": "Symptom",
+      "symptom": "Hypotension",
+      "exact": {
+        "quantity": 0
+      },
+      "direct_transition": "ICU_Discharge"
+    },
+    "ICU_Discharge": {
+      "type": "EncounterEnd",
+      "discharge_disposition": {
+        "system": "NUBC",
+        "code": 1,
+        "display": "Discharge to home"
+      },
+      "direct_transition": "Call_Public_Health"
+    },
+    "Call_Public_Health": {
+      "type": "CallSubmodule",
+      "submodule": "andv/andv_public_health",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}

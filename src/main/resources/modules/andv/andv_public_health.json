@@ -1,0 +1,192 @@
+{
+  "name": "andv_public_health",
+  "remarks": [
+    "ANDV Public Health Overlay Submodule",
+    "",
+    "Encodes the public-health response events that accompany confirmed/probable",
+    "Andes virus cases: isolation, PPE, contact tracing, and 42-day monitoring.",
+    "",
+    "This submodule is called for ALL patients who reach clinical diagnosis",
+    "(both HCPS survivors and ward-level patients). It overlays outbreak-management",
+    "workflows onto the synthetic record, not just bedside clinical care.",
+    "",
+    "Key interventions encoded:",
+    "  - Single-room isolation with airborne/enhanced contact precautions",
+    "    (CDC 2026 HAN: AIIR + N95 respirator, gown, gloves, eye protection)",
+    "  - Mandatory public health notification",
+    "  - 42-day contact monitoring period (per CDC/WHO/ECDC guidance)",
+    "  - Contact tracing status tracked as patient attribute",
+    "",
+    "Attributes set:",
+    "  andv_contact_tracing_status : 'initiated' → 'completed'",
+    "  andv_isolation_active        : true → false",
+    "",
+    "SNOMED codes marked 'verify' need confirmation against current release.",
+    "  734163000: Care plan (record artifact)  [used in sleep_apnea.json — confirmed]",
+    "  409524006: Airborne precautions (procedure) — verify",
+    "  409526008: Contact precautions (procedure) — verify",
+    "  416940007: Mandatory notification of disease (procedure) — verify",
+    "",
+    "References:",
+    "  - CDC 2026 HAN notice HAN00528 (AIIR + N95 recommendation)",
+    "  - WHO technical note: MV Hondius cruise-ship cluster 2026",
+    "  - ECDC rapid scientific advice: Andes hantavirus management of passengers",
+    "  - WHO/PAHO hantavirus outbreak toolbox (42-day monitoring period)"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Set_Isolation_Active"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Set_Isolation_Active": {
+      "type": "SetAttribute",
+      "attribute": "andv_isolation_active",
+      "value": true,
+      "direct_transition": "Isolation_Encounter"
+    },
+    "Isolation_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "inpatient",
+      "reason": "andv_hantavirus_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "Isolation_Care_Plan"
+    },
+    "Isolation_Care_Plan": {
+      "type": "CarePlanStart",
+      "remarks": [
+        "Airborne infection isolation per CDC HAN guidance.",
+        "SNOMED 734163000: Care plan (record artifact) — confirmed in existing modules."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "734163000",
+          "display": "Care plan (record artifact)"
+        }
+      ],
+      "reason": "andv_hantavirus_condition",
+      "activities": [
+        {
+          "system": "SNOMED-CT",
+          "code": "409524006",
+          "display": "Airborne precautions (procedure)"
+        },
+        {
+          "system": "SNOMED-CT",
+          "code": "409526008",
+          "display": "Contact precautions (procedure)"
+        }
+      ],
+      "direct_transition": "PPE_Procedure"
+    },
+    "PPE_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "Document PPE requirement: N95/FFP2 respirator, gown, gloves, eye protection.",
+        "SNOMED 225344000: Use of personal protective equipment — verify."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "225344000",
+          "display": "Use of personal protective equipment (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 30,
+        "high": 30,
+        "unit": "minutes"
+      },
+      "reason": "andv_hantavirus_condition",
+      "direct_transition": "Public_Health_Notification"
+    },
+    "Public_Health_Notification": {
+      "type": "Procedure",
+      "remarks": [
+        "Mandatory public health notification for confirmed/probable ANDV case.",
+        "SNOMED 416940007: Mandatory notification of disease (procedure) — verify."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "416940007",
+          "display": "Mandatory notification of disease (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 30,
+        "high": 30,
+        "unit": "minutes"
+      },
+      "reason": "andv_hantavirus_condition",
+      "direct_transition": "Set_Contact_Tracing_Initiated"
+    },
+    "Set_Contact_Tracing_Initiated": {
+      "type": "SetAttribute",
+      "attribute": "andv_contact_tracing_status",
+      "value": "initiated",
+      "direct_transition": "End_Isolation_Encounter"
+    },
+    "End_Isolation_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Contact_Monitoring_Period"
+    },
+    "Contact_Monitoring_Period": {
+      "type": "Delay",
+      "remarks": [
+        "42-day monitoring period after last high-risk exposure.",
+        "CDC/WHO/ECDC all specify 42 days (maximum incubation + safety margin).",
+        "High-risk contacts receive daily monitoring during this window."
+      ],
+      "exact": {
+        "quantity": 42,
+        "unit": "days"
+      },
+      "direct_transition": "Set_Contact_Tracing_Completed"
+    },
+    "Set_Contact_Tracing_Completed": {
+      "type": "SetAttribute",
+      "attribute": "andv_contact_tracing_status",
+      "value": "completed",
+      "direct_transition": "Set_Isolation_Inactive"
+    },
+    "Set_Isolation_Inactive": {
+      "type": "SetAttribute",
+      "attribute": "andv_isolation_active",
+      "value": false,
+      "direct_transition": "Monitoring_Closeout_Encounter"
+    },
+    "Monitoring_Closeout_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "ambulatory",
+      "reason": "andv_hantavirus_condition",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185347001",
+          "display": "Encounter for problem (procedure)"
+        }
+      ],
+      "direct_transition": "End_Isolation_Care_Plan"
+    },
+    "End_Isolation_Care_Plan": {
+      "type": "CarePlanEnd",
+      "careplan": "Isolation_Care_Plan",
+      "direct_transition": "End_Monitoring_Closeout_Encounter"
+    },
+    "End_Monitoring_Closeout_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}

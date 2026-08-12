@@ -1,0 +1,83 @@
+{
+  "name": "hantavirus",
+  "remarks": [
+    "Andes Virus (ANDV) / Hantavirus Cardiopulmonary Syndrome (HCPS)",
+    "",
+    "This is the entry-point module for Andes virus disease. It gates population-level",
+    "prevalence, then delegates to five submodules under andv/ for the full clinical pathway.",
+    "",
+    "Design notes:",
+    "  - Synthea is not an epidemic spread engine. This module seeds individual exposure",
+    "    probabilistically. For cluster/outbreak modeling, an external scenario engine",
+    "    should set andv_exposed=true on target patients and this module routes accordingly.",
+    "  - Prevalence gate (0.5%) is a tunable scenario prior, not an empiric constant.",
+    "    Real endemic-area incidence is much lower; adjust for outbreak scenarios.",
+    "  - Human-to-human transmission (rare, cluster-capable) is modeled in andv_exposure.",
+    "",
+    "References:",
+    "  - WHO 2026 DON601 Andes virus cruise-associated cluster",
+    "  - CDC Hantavirus/Andes virus guidance (2026)",
+    "  - PAHO hantavirus epidemiological alert 2025",
+    "  - Design brief: Designing a Synthea Module for Andes Virus Outbreaks (2026)"
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Age_Guard"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Age_Guard": {
+      "type": "Guard",
+      "remarks": [
+        "Hantavirus can infect any age. Guard on age >=1 to avoid neonatal period.",
+        "After passing, probabilistically seed exposure at ~0.5% of patients.",
+        "Adjust the distribution below to match your scenario prevalence."
+      ],
+      "allow": {
+        "condition_type": "Age",
+        "operator": ">=",
+        "quantity": 1,
+        "unit": "years"
+      },
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "andv_exposed",
+            "operator": "==",
+            "value": true
+          },
+          "transition": "Call_Exposure_Submodule"
+        },
+        {
+          "transition": "Prevalence_Check"
+        }
+      ]
+    },
+    "Prevalence_Check": {
+      "type": "Simple",
+      "remarks": [
+        "0.5% prevalence gate for general population runs.",
+        "Tune distribution below for outbreak scenarios (higher) or background endemic (lower)."
+      ],
+      "distributed_transition": [
+        {
+          "transition": "Call_Exposure_Submodule",
+          "distribution": 0.005
+        },
+        {
+          "transition": "Terminal",
+          "distribution": 0.995
+        }
+      ]
+    },
+    "Call_Exposure_Submodule": {
+      "type": "CallSubmodule",
+      "submodule": "andv/andv_exposure",
+      "direct_transition": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}
