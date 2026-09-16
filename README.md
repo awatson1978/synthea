@@ -27,7 +27,7 @@ These instructions are intended for those wishing to examine the Synthea source 
 ### Installation
 
 **System Requirements:**
-Synthea<sup>TM</sup> requires Java JDK 11 or newer. We strongly recommend using a Long-Term Support (LTS) release of Java, 11 or 17, as issues may occur with more recent non-LTS versions.
+Synthea<sup>TM</sup> requires Java JDK 17 or newer. We strongly recommend using a Long-Term Support (LTS) release of Java, 17 or 25, as issues may occur with more recent non-LTS versions.
 
 To clone the Synthea<sup>TM</sup> repo, then build and run the test suite:
 ```
@@ -59,7 +59,7 @@ run_synthea [-s seed] [-p populationSize] [state [city]]
 
 Full usage info can be printed by passing the `-h` option.
 ```
-$ ./run_synthea -h     
+$ ./run_synthea -h
 
 > Task :run
 Usage: run_synthea [options] [state [city]]
@@ -111,7 +111,7 @@ Generate a list of concepts (used in the records) or attributes (variables on ea
 
 # License
 
-Copyright 2017-2023 The MITRE Corporation
+Copyright 2017-2025 The MITRE Corporation
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

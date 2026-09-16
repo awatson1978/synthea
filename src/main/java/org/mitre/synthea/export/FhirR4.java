@@ -10,7 +10,7 @@ import com.google.gson.JsonObject;
 
 import java.awt.geom.Point2D;
 import java.io.IOException;
-import java.util.AbstractMap;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -143,7 +143,6 @@ import org.mitre.synthea.engine.Components.Attachment;
 import org.mitre.synthea.export.rif.CodeMapper;
 import org.mitre.synthea.helpers.Config;
 import org.mitre.synthea.helpers.RandomNumberGenerator;
-import org.mitre.synthea.helpers.RandomValueGenerator;
 import org.mitre.synthea.helpers.SimpleCSV;
 import org.mitre.synthea.helpers.Utilities;
 import org.mitre.synthea.identity.Entity;
@@ -200,9 +199,10 @@ public class FhirR4 {
   private static final Table<String, String, String> US_CORE_4_MAPPING;
   private static final Table<String, String, String> US_CORE_5_MAPPING;
   private static final Table<String, String, String> US_CORE_6_MAPPING;
+  private static final Table<String, String, String> US_CORE_7_MAPPING;
 
   public static enum USCoreVersion {
-    v311, v400, v501, v610
+    v311, v400, v501, v610, v700
   }
 
   protected static boolean useUSCore3() {
@@ -237,6 +237,14 @@ public class FhirR4 {
     return useUSCore6;
   }
 
+  protected static boolean useUSCore7() {
+    boolean useUSCore7 = USE_US_CORE_IG && US_CORE_VERSION.startsWith("7");
+    if (useUSCore7) {
+      US_CORE_MAPPING = US_CORE_7_MAPPING;
+    }
+    return useUSCore7;
+  }
+
   private static final String COUNTRY_CODE = Config.get("generate.geography.country_code");
   private static final String PASSPORT_URI = Config.get("generate.geography.passport_uri", "http://hl7.org/fhir/sid/passport-USA");
 
@@ -247,12 +255,13 @@ public class FhirR4 {
     reloadIncludeExclude();
 
     Map<String, Table<String, String, String>> usCoreMappings =
-        loadMappingWithVersions("us_core_mapping.csv", "3", "4", "5", "6");
+        loadMappingWithVersions("us_core_mapping.csv", "3", "4", "5", "6", "7");
 
     US_CORE_3_MAPPING = usCoreMappings.get("3");
     US_CORE_4_MAPPING = usCoreMappings.get("4");
     US_CORE_5_MAPPING = usCoreMappings.get("5");
     US_CORE_6_MAPPING = usCoreMappings.get("6");
+    US_CORE_7_MAPPING = usCoreMappings.get("7");
 
     if (US_CORE_VERSION.startsWith("3")) {
       US_CORE_MAPPING = US_CORE_3_MAPPING;
@@ -262,6 +271,8 @@ public class FhirR4 {
       US_CORE_MAPPING = US_CORE_5_MAPPING;
     } else if (US_CORE_VERSION.startsWith("6")) {
       US_CORE_MAPPING = US_CORE_6_MAPPING;
+    } else if (US_CORE_VERSION.startsWith("7")) {
+      US_CORE_MAPPING = US_CORE_7_MAPPING;
     }
   }
 
@@ -372,7 +383,7 @@ public class FhirR4 {
 
         if (StringUtils.isBlank(version) || version.contains(versionKey)) {
           // blank means applies to ALL versions
-          // version.contains allows for things like "4,5,6"
+          // version.contains allows for things like "4+5+6"
           mappingTable.put(system, code, url);
         }
       }
@@ -854,23 +865,25 @@ public class FhirR4 {
   }
 
   /**
-   * Add a code translation (if available) of the supplied source code to the
-   * supplied CodeableConcept.
-   * @param codeSystem the code system of the translated code
+   * Add code translations (if available) of the supplied source code to the
+   * supplied CodeableConcept. One translation is added for each code system
+   * configured via {@code exporter.code_map.<code system>}, using that code
+   * system's own URI. See {@link Exporter#loadCodeMappers()}.
    * @param from the source code
    * @param to the CodeableConcept to add the translation to
    * @param rand a source of randomness
    */
-  private static void addTranslation(String codeSystem, Code from,
-          CodeableConcept to, RandomNumberGenerator rand) {
-    CodeMapper mapper = Exporter.getCodeMapper(codeSystem);
-    if (mapper != null && mapper.canMap(from)) {
-      Coding coding = new Coding();
-      Map.Entry<String, String> mappedCode = mapper.mapToCodeAndDescription(from, rand);
-      coding.setCode(mappedCode.getKey());
-      coding.setDisplay(mappedCode.getValue());
-      coding.setSystem(ExportHelper.getSystemURI("ICD10-CM"));
-      to.addCoding(coding);
+  private static void addTranslation(Code from, CodeableConcept to, RandomNumberGenerator rand) {
+    for (Map.Entry<String, CodeMapper> entry : Exporter.getCodeMappers().entrySet()) {
+      CodeMapper mapper = entry.getValue();
+      if (mapper != null && mapper.canMap(from)) {
+        Coding coding = new Coding();
+        Map.Entry<String, String> mappedCode = mapper.mapToCodeAndDescription(from, rand);
+        coding.setCode(mappedCode.getKey());
+        coding.setDisplay(mappedCode.getValue());
+        coding.setSystem(ExportHelper.getSystemURI(entry.getKey()));
+        to.addCoding(coding);
+      }
     }
   }
 
@@ -919,8 +932,7 @@ public class FhirR4 {
     if (encounter.reason != null) {
       encounterResource.addReasonCode().addCoding().setCode(encounter.reason.code)
           .setDisplay(encounter.reason.display).setSystem(SNOMED_URI);
-      addTranslation("ICD10-CM", encounter.reason,
-              encounterResource.getReasonCodeFirstRep(), person);
+      addTranslation(encounter.reason, encounterResource.getReasonCodeFirstRep(), person);
     }
 
     Provider provider = encounter.provider;
@@ -1230,10 +1242,18 @@ public class FhirR4 {
       .setCode("normal");
     claimResource.setPriority(priority);
 
-    // add item for encounter
-    claimResource.addItem(new ItemComponent(new PositiveIntType(1),
+    // add item for encounter with its cost
+    BigDecimal totalNet = BigDecimal.ZERO;
+    BigDecimal encounterCost = encounter.getCost();
+    ItemComponent encounterItem = new ItemComponent(new PositiveIntType(1),
           encounterResource.getTypeFirstRep())
-        .addEncounter(new Reference(encounterEntry.getFullUrl())));
+        .addEncounter(new Reference(encounterEntry.getFullUrl()));
+    Money encounterMoney = new Money();
+    encounterMoney.setCurrency("USD");
+    encounterMoney.setValue(encounterCost);
+    encounterItem.setNet(encounterMoney);
+    claimResource.addItem(encounterItem);
+    totalNet = totalNet.add(encounterCost);
 
     int itemSequence = 2;
     int conditionSequence = 1;
@@ -1255,6 +1275,7 @@ public class FhirR4 {
         moneyResource.setValue(item.getCost());
         claimItem.setNet(moneyResource);
         claimResource.addItem(claimItem);
+        totalNet = totalNet.add(item.getCost());
 
         if (item instanceof Procedure) {
           Type procedureReference = new Reference(item.fullUrl);
@@ -1301,7 +1322,7 @@ public class FhirR4 {
 
     Money moneyResource = new Money();
     moneyResource.setCurrency("USD");
-    moneyResource.setValue(encounter.claim.getTotalClaimCost());
+    moneyResource.setValue(totalNet);
     claimResource.setTotal(moneyResource);
 
     return newEntry(bundle, claimResource, encounter.claim.uuid.toString());
@@ -1406,6 +1427,7 @@ public class FhirR4 {
     eob.addContained(referral);
     eob.setReferral(new Reference().setReference("#referral"));
 
+    // TODO: Make Coverage separate resources for US Core 6 & 7?
     // Get the insurance info at the time that the encounter occurred.
     Payer payer = claim.getPayer();
     Coverage coverage = new Coverage();
@@ -1641,7 +1663,7 @@ public class FhirR4 {
 
     if (USE_US_CORE_IG) {
       Meta meta = new Meta();
-      if (useUSCore5() || useUSCore6()) {
+      if (useUSCore5() || useUSCore6() || useUSCore7()) {
         meta.addProfile(
             "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-encounter-diagnosis");
       } else {
@@ -1659,7 +1681,7 @@ public class FhirR4 {
 
     Code code = condition.codes.get(0);
     CodeableConcept concept = mapCodeToCodeableConcept(code, SNOMED_URI);
-    addTranslation("ICD10-CM", code, concept, rand);
+    addTranslation(code, concept, rand);
     conditionResource.setCode(concept);
 
     CodeableConcept verification = new CodeableConcept();
@@ -1862,21 +1884,27 @@ public class FhirR4 {
       String codeMappingUri = US_CORE_MAPPING.get(LOINC_URI, code.code);
       if (codeMappingUri != null) {
         meta.addProfile(codeMappingUri);
-        if (!codeMappingUri.contains("/us/core/") && observation.category.equals("vital-signs")) {
+        if (!codeMappingUri.contains("/us/core/") && "vital-signs".equals(observation.category)) {
           meta.addProfile("http://hl7.org/fhir/us/core/StructureDefinition/us-core-vital-signs");
         }
-      } else if (observation.report != null && observation.category.equals("laboratory")) {
+      } else if (observation.report != null && "laboratory".equals(observation.category)) {
         meta.addProfile("http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-lab");
       }
 
+
       if (observation.category != null) {
-        if (useUSCore6()) {
+        if (useUSCore6() || useUSCore7()) {
           switch (observation.category) {
             case "imaging":
               meta.addProfile("http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-clinical-result");
               break;
             case "social-history":
-              meta.addProfile("http://hl7.org/fhir/us/core/StructureDefinition/us-core-simple-observation");
+              if (code.code.equals("82810-3")) {
+                meta.addProfile("http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-pregnancystatus");
+              } else {
+                meta.addProfile("http://hl7.org/fhir/us/core/StructureDefinition/us-core-simple-observation");
+              }
+
               break;
             case "survey":
               meta.addProfile("http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-screening-assessment");
@@ -2044,7 +2072,7 @@ public class FhirR4 {
         // we didn't find a matching Condition,
         // fallback to just reason code
         procedureResource.addReasonCode(mapCodeToCodeableConcept(reason, SNOMED_URI));
-        addTranslation("ICD10-CM", reason, procedureResource.getReasonCodeFirstRep(), person);
+        addTranslation(reason, procedureResource.getReasonCodeFirstRep(), person);
       }
     }
 
@@ -2354,8 +2382,7 @@ public class FhirR4 {
         // we didn't find a matching Condition,
         // fallback to just reason code
         medicationResource.addReasonCode(mapCodeToCodeableConcept(reason, SNOMED_URI));
-        addTranslation("ICD10-CM", reason, medicationResource.getReasonCodeFirstRep(),
-                person);
+        addTranslation(reason, medicationResource.getReasonCodeFirstRep(), person);
       }
     }
 
@@ -2508,8 +2535,7 @@ public class FhirR4 {
         // we didn't find a matching Condition,
         // fallback to just reason code
         medicationResource.addReasonCode(mapCodeToCodeableConcept(reason, SNOMED_URI));
-        addTranslation("ICD10-CM", reason, medicationResource.getReasonCodeFirstRep(),
-                person);
+        addTranslation(reason, medicationResource.getReasonCodeFirstRep(), person);
       }
     }
 
@@ -2535,7 +2561,7 @@ public class FhirR4 {
     DiagnosticReport reportResource = new DiagnosticReport();
     boolean labsOnly = true;
     for (Observation observation : report.observations) {
-      labsOnly = labsOnly && observation.category.equalsIgnoreCase("laboratory");
+      labsOnly = labsOnly && "laboratory".equalsIgnoreCase(observation.category);
     }
     if (labsOnly && USE_US_CORE_IG) {
       Meta meta = new Meta();
@@ -2753,8 +2779,7 @@ public class FhirR4 {
           activityDetailComponent.addReasonReference().setReference(reasonCondition.getFullUrl());
         } else if (reason != null) {
           activityDetailComponent.addReasonCode(mapCodeToCodeableConcept(reason, SNOMED_URI));
-          addTranslation("ICD10-CM", reason, activityDetailComponent.getReasonCodeFirstRep(),
-                  person);
+          addTranslation(reason, activityDetailComponent.getReasonCodeFirstRep(), person);
         }
 
         activityComponent.setDetail(activityDetailComponent);
@@ -2902,7 +2927,7 @@ public class FhirR4 {
     if (carePlan.reasons != null && !carePlan.reasons.isEmpty()) {
       for (Code code : carePlan.reasons) {
         CodeableConcept concept = mapCodeToCodeableConcept(code, SNOMED_URI);
-        addTranslation("ICD10-CM", code, concept, person);
+        addTranslation(code, concept, person);
         careTeam.addReasonCode(concept);
       }
     }
