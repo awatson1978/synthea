@@ -278,6 +278,10 @@
           "value_set": ""
         }
       ],
+      "range": {
+        "low": 4,
+        "high": 7
+      },
       "direct_transition": "Terminal",
       "name": "SleepAnalysis",
       "remarks": [

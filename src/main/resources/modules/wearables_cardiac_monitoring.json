@@ -80,11 +80,11 @@
       "distributed_transition": [
         {
           "transition": "Wearable_Device_Adoption",
-          "distribution": 0.30
+          "distribution": 0.3
         },
         {
           "transition": "Terminal",
-          "distribution": 0.70
+          "distribution": 0.7
         }
       ]
     },
@@ -97,11 +97,11 @@
       "distributed_transition": [
         {
           "transition": "Fitness_Only_Tracking",
-          "distribution": 0.60
+          "distribution": 0.6
         },
         {
           "transition": "Clinical_Monitoring_Pathway",
-          "distribution": 0.40
+          "distribution": 0.4
         }
       ]
     },
@@ -187,8 +187,7 @@
       "name": "Wellness_Baseline_Encounter_End"
     },
     "Fitness_Baseline": {
-      "type": "Observation",
-      "category": "exam",
+      "type": "Procedure",
       "codes": [
         {
           "system": "SNOMED-CT",

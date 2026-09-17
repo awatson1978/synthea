@@ -11,9 +11,13 @@ import java.util.List;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mitre.synthea.helpers.Config;
 import org.mitre.synthea.helpers.TimeSeriesData;
+import org.mitre.synthea.world.agents.PayerManager;
 import org.mitre.synthea.world.agents.Person;
+import org.mitre.synthea.world.concepts.HealthRecord;
 import org.mitre.synthea.world.concepts.VitalSign;
+import org.mitre.synthea.world.geography.Location;
 
 /**
  * Integration tests for the physiology "state path" wearables/digital-twin modules added in
@@ -113,5 +117,61 @@ public class PhysiologyModuleStateTest {
   public void sleepApneaOxygenIntakeSimulationRuns() throws Exception {
     // Pulmonary, ~1/minute time scale: Guyton1972 pulmonary O2 intake -> arterial pO2 (PO2ART).
     assertSimulationPopulates("wearables_sleepapnea.json", "O2_Sim", "o2_result");
+  }
+
+  /**
+   * Every Observation these modules record must carry a value (or sub-observations). US Core
+   * invariant us-core-2 rejects an exported Observation with neither value[x] nor
+   * dataAbsentReason, and FhirR4 never emits a dataAbsentReason — so a valueless Observation
+   * state here is an intermittent FHIRR4ExporterTest US Core validation failure waiting on the
+   * right randomly-generated patient.
+   */
+  @Test
+  public void observationStatesAlwaysRecordValues() throws Exception {
+    // Encounters carry a Claim, which requires coverage at encounter time.
+    String testStateDefault = Config.get("test_state.default", "Massachusetts");
+    PayerManager.loadPayers(new Location(testStateDefault, null));
+    person.coverage.setPlanToNoInsurance((long) person.attributes.get(Person.BIRTHDATE));
+    // Setting a later plan extends the first record's coverage up to that point,
+    // so the encounter at `time` falls inside the birth plan's coverage window.
+    person.coverage.setPlanToNoInsurance(
+        time + org.mitre.synthea.helpers.Utilities.convertTime("years", 20));
+
+    // Open an encounter directly on the record so recording observations does not
+    // trigger EncounterModule's provider lookup (no providers are loaded here, and
+    // other test classes may have cleared them anyway).
+    person.record.encounterStart(time, HealthRecord.EncounterType.WELLNESS);
+
+    String[] moduleFiles = {
+        "endometriosis.json", "wearables_cardiac_monitoring.json", "wearables_sleepapnea.json"};
+    for (String moduleFile : moduleFiles) {
+      Path modulePath = Paths.get("modules").resolve(moduleFile);
+      Module module = Module.loadFile(modulePath, false, null, false);
+
+      // Run the Physiology states first so sampled-data and chart Observation states
+      // find their input attributes populated, then run every Observation state.
+      for (String stateName : module.getStateNames()) {
+        State state = module.getState(stateName);
+        if (state instanceof State.Physiology) {
+          state.process(person, time);
+        }
+      }
+      for (String stateName : module.getStateNames()) {
+        State state = module.getState(stateName);
+        if (state instanceof State.Observation) {
+          assertTrue(moduleFile + " state " + stateName + " should return true from process()",
+              state.process(person, time));
+        }
+      }
+    }
+
+    for (HealthRecord.Encounter encounter : person.record.encounters) {
+      for (HealthRecord.Observation observation : encounter.observations) {
+        boolean hasSubObservations =
+            observation.observations != null && !observation.observations.isEmpty();
+        assertTrue("Observation " + observation.type + " was recorded without a value",
+            observation.value != null || hasSubObservations);
+      }
+    }
   }
 }
