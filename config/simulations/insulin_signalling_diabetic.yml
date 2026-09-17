@@ -33,7 +33,7 @@ duration: 12
 charts:
     - filename: insulin_signalling_diabetic.png
       type: line
-      title: "insulin_signalling_diabetic"
+      title: "Insulin signalling in adipocytes - type 2 diabetic (Brannmark2013)"
       axisParamX: time
       axisLabelX: time (hr)
       axisLabelY: Metabolites

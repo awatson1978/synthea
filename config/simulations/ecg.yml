@@ -37,7 +37,7 @@ inputs:
 charts:
     - filename: ecg.png
       type: line
-      title: "ECG: AFib"
+      title: "Synthetic ECG with arrhythmia (McSharry2003)"
       axisParamX: time
       axisLabelX: time (s)
       axisLabelY: Current (A)

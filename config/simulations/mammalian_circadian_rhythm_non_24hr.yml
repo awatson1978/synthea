@@ -34,10 +34,10 @@ duration: 168
 charts:
     - filename: mammalian_circadian_rhythm_non_24hr.png
       type: line
-      title: "mammalian_circadian_rhythm_non_24hr"
+      title: "Non-24-hour mammalian circadian rhythm (Leloup2004)"
       axisParamX: time
       axisLabelX: time (hr)
-      axisLabelY: MB
+      axisLabelY: Bmal1 mRNA MB (a.u.)
       #lowerBoundY: -0.05
       #upperBoundY: 0.15
       series:

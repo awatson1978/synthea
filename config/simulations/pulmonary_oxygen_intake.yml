@@ -34,7 +34,7 @@ inputs:
 charts:
     - filename: pulmonary_oxygen_intake.png
       type: line
-      title: "pulmonary_oxygen_intake"
+      title: "Pulmonary oxygen intake - arterial pO2 (Guyton1972)"
       axisParamX: time
       axisLabelX: time (s)
       axisLabelY: N·m−2

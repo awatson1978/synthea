@@ -35,7 +35,7 @@ duration: 28
 charts:
     - filename: menstrual_cycle.png
       type: line
-      title: "menstrual_cycle"
+      title: "Menstrual cycle hormones over 28 days (Roblitz2013)"
       axisParamX: time
       axisLabelX: time (d)
       axisLabelY: IU/L

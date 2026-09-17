@@ -33,7 +33,7 @@ duration: 12
 charts:
     - filename: insulin_signalling_normal.png
       type: line
-      title: "insulin_signalling_normal"
+      title: "Insulin signalling in adipocytes - normal (Brannmark2013)"
       axisParamX: time
       axisLabelX: time (hr)
       axisLabelY: Metabolites

@@ -33,10 +33,10 @@ duration: 24
 charts:
     - filename: circadian_clock.png
       type: line
-      title: "circadian_clock"
+      title: "Circadian clock protein over 24 h (Hong2009)"
       axisParamX: time
       axisLabelX: time (hr)
-      axisLabelY: kms
+      axisLabelY: clock protein CPtot (a.u.)
       #lowerBoundY: -0.05
       #upperBoundY: 0.15
       series:
